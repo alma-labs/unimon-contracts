@@ -25,8 +25,8 @@ This is a foundry repository containing the hook & auxillary contracts needed to
 
 ## Deployed Contracts
 
-- [UnimonEnergy](https://uniscan.xyz/address/0xdaabe932b36bbabd9017cc9e03e8633c42fe7a12)
-- [UnimonHook](https://uniscan.xyz/address/0x2daf085ad7e6b7b1e3dc7415923e7c1cad5ee8c0)
+- [UnimonEnergy](https://uniscan.xyz/address/0x7edc481366a345d7f9fcecb207408b5f2887ff99)
+- [UnimonHook](https://uniscan.xyz/address/0x7f7d7e4a9d4da8997730997983c5ca64846868c0)
 - [UserRegistry](https://uniscan.xyz/address/0xb11749d5392f1a3ed18f42dd2e438348d9e5c0d4)
 
 ## 📝 Important Notes
