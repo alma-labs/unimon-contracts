@@ -17,11 +17,10 @@ const config: HardhatUserConfig = {
     },
   },
   paths: {
-    root: "./hardhat",
-    sources: "./contracts",
-    tests: "./test",
-    cache: "./cache",
-    artifacts: "./artifacts",
+    sources: "contracts",
+    tests: "test",
+    cache: "./hardhat/cache",
+    artifacts: "./hardhat/artifacts"
   },
   networks: {
     unichain: {
