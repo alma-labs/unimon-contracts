@@ -7,225 +7,320 @@ import {UnimonHook} from "./UnimonHook.sol";
 
 contract UnimonBattles is Ownable {
     uint256 public constant MAX_REVIVES = 2;
-    uint256 public constant BATTLE_CYCLE_DURATION = 1 days;
-    uint256 public constant BATTLE_CUTOFF_PERIOD = 1 hours;
+    uint256 public constant CYCLE_DURATION = 24 hours;
+    uint256 public constant ADMIN_GRACE_PERIOD = 1 hours;
 
+    uint256 public startTimestamp;
     UnimonEnergy public unimonEnergy;
     UnimonHook public unimonHook;
-    uint256 public nextEncounterId;
-    uint256 public battleStartTime;
-    bool public battleTimeInitialized;
-    bool public cycleInResolution;
+    uint256 public currentEncounterId;
+    bool public battleEnabled;
+
+    mapping(uint256 => BattleData) public unimonBattleData;
+    mapping(uint256 => Encounter) public encounters;
+    mapping(uint256 => CycleData) public cycles;
+    mapping(uint256 => bool) public cycleInitialized;
 
     enum BattleStatus {
-        READY,
-        IN_BATTLE,
-        FAINTED,
-        DEAD
+        READY, // Able to participate in a battle
+        IN_BATTLE, // In an unfinished encounter
+        WON, // Won for the active cycle
+        LOST, // Lost for the active cycle
+        FAINTED, // Lost or did not enter a battle in the previous cycle
+        DEAD // You're outta here!
     }
 
     struct BattleData {
         BattleStatus status;
         uint256 reviveCount;
-        uint256 lastBattleTimestamp;
+        uint256 lastBattleCycle;
         uint256 currentEncounterId;
     }
 
     struct Encounter {
+        uint256 battleCycle;
         uint256 attacker;
         uint256 defender;
         bool resolved;
         uint256 winner;
+        uint256 timestamp;
+        bool randomnessRequested;
+        bool randomnessFulfilled;
+        uint256 randomNumber;
     }
 
-    mapping(uint256 => BattleData) public battleData;
-    mapping(uint256 => Encounter) public encounters;
-    mapping(uint256 => uint256[]) public cycleEncounters;
+    struct CycleData {
+        uint256 startTime;
+        bool cycleComplete;
+        mapping(uint256 => bool) isActive;
+    }
 
-    error NotOwnerOfToken();
-    error AlreadyInEncounter();
-    error UnimonFainted();
-    error UnimonDead();
-    error MaxRevivesReached();
-    error RevivalPeriodEnded();
-    error NotFainted();
-    error SameUnimon();
-    error InvalidBattleCycle();
-    error NoEncountersInRange();
-    error CycleInResolution();
-    error UnimonNotHatched();
-    error UnimonNotFound();
+    event CycleStarted(uint256 indexed cycleId, uint256 startTime);
+    event EncounterStarted(
+        uint256 indexed encounterId,
+        uint256 indexed attackerId,
+        uint256 indexed defenderId,
+        address attackerPlayer,
+        address defenderPlayer,
+        uint256 timestamp
+    );
+    event EncounterResolved(
+        uint256 indexed encounterId,
+        uint256 indexed winnerId,
+        uint256 indexed loserId,
+        address winnerPlayer,
+        address loserPlayer,
+        uint256 timestamp
+    );
+    event CycleCompleted(uint256 indexed cycleId, uint256 indexed winner);
+    event UnimonRevived(
+        uint256 indexed unimonId,
+        address indexed player,
+        uint256 reviveCost,
+        uint256 newReviveCount,
+        uint256 timestamp
+    );
+    event RandomnessRequested(uint256 indexed encounterId, uint256 timestamp);
+    event RandomnessFulfilled(uint256 indexed encounterId, uint256 timestamp);
 
-    event EncounterResolved(uint256 indexed encounterId, uint256 indexed winnerId, uint256 indexed loserId);
+    error NotOwner();
+    error NotHatched();
+    error NotReady();
+    error InvalidBattleState();
+    error TooManyRevives();
+    error BattleNotResolved();
+    error RandomnessNotFulfilled();
+    error InvalidBattleId();
+    error CycleNotActive();
+    error AlreadyParticipated();
+    error OutsideBattleWindow();
+    error BattleWindowActive();
+    error OpponentNotReady();
+    error BattlesNotEnabled();
 
-    constructor(address _unimonHook) Ownable(msg.sender) {
+    constructor(address _unimonHook, address _unimonEnergy, uint256 _startTimestamp) Ownable(msg.sender) {
+        require(_startTimestamp > block.timestamp, "Start time must be in future");
         unimonHook = UnimonHook(_unimonHook);
-    }
-
-    function getCurrentBattleCycle() public view returns (uint256, uint256, uint256) {
-        require(battleTimeInitialized, "Battle time not initialized");
-        uint256 currentCycle = (block.timestamp - battleStartTime) / BATTLE_CYCLE_DURATION;
-        uint256 cycleStartTime = battleStartTime + (currentCycle * BATTLE_CYCLE_DURATION);
-        uint256 cycleEndTime = cycleStartTime + BATTLE_CYCLE_DURATION;
-        return (currentCycle, cycleStartTime, cycleEndTime);
-    }
-
-    function getEncounterCycle(uint256 encounterId) public view returns (uint256) {
-        Encounter memory encounter = encounters[encounterId];
-        require(encounter.attacker != 0, "EncounterNotFound");
-        BattleData memory attackerData = battleData[encounter.attacker];
-        return (attackerData.lastBattleTimestamp - battleStartTime) / BATTLE_CYCLE_DURATION;
-    }
-
-    function startEncounter(uint256 attackerId, uint256 defenderId) external {
-        require(battleTimeInitialized, "Battle time not initialized");
-        if (cycleInResolution) revert CycleInResolution();
-        if (attackerId == defenderId) revert SameUnimon();
-
-        // Check ownership
-        if (unimonHook.ownerOf(attackerId) != msg.sender) revert NotOwnerOfToken();
-
-        (uint256 currentCycle, , uint256 cycleEndTime) = getCurrentBattleCycle();
-        if (block.timestamp + BATTLE_CUTOFF_PERIOD >= cycleEndTime) revert InvalidBattleCycle();
-
-        // Validate Unimon states from UnimonHook
-        UnimonHook.UnimonData memory attackerNFTData = unimonHook.getUnimonData(attackerId);
-        UnimonHook.UnimonData memory defenderNFTData = unimonHook.getUnimonData(defenderId);
-
-        if (attackerNFTData.status != UnimonHook.Status.HATCHED) revert UnimonNotHatched();
-        if (defenderNFTData.status != UnimonHook.Status.HATCHED) revert UnimonNotHatched();
-
-        // Validate battle states
-        BattleData storage attackerBattleData = battleData[attackerId];
-        BattleData storage defenderBattleData = battleData[defenderId];
-
-        if (attackerBattleData.status != BattleStatus.READY) revert UnimonFainted();
-        if (defenderBattleData.status != BattleStatus.READY) revert UnimonFainted();
-        if (attackerBattleData.currentEncounterId != 0) revert AlreadyInEncounter();
-        if (defenderBattleData.currentEncounterId != 0) revert AlreadyInEncounter();
-
-        // Create encounter
-        uint256 encounterId = nextEncounterId++;
-        encounters[encounterId] = Encounter({attacker: attackerId, defender: defenderId, resolved: false, winner: 0});
-        cycleEncounters[currentCycle].push(encounterId);
-
-        // Update battle data
-        attackerBattleData.status = BattleStatus.IN_BATTLE;
-        defenderBattleData.status = BattleStatus.IN_BATTLE;
-        attackerBattleData.currentEncounterId = encounterId;
-        defenderBattleData.currentEncounterId = encounterId;
-        attackerBattleData.lastBattleTimestamp = block.timestamp;
-        defenderBattleData.lastBattleTimestamp = block.timestamp;
-    }
-
-    function reviveUnimon(uint256 tokenId) external {
-        if (unimonHook.ownerOf(tokenId) != msg.sender) revert NotOwnerOfToken();
-
-        BattleData storage battleStats = battleData[tokenId];
-        if (battleStats.status != BattleStatus.FAINTED) revert NotFainted();
-        if (battleStats.reviveCount >= MAX_REVIVES) revert MaxRevivesReached();
-
-        // Check if within revival period
-        uint256 currentCycle = (block.timestamp - battleStartTime) / BATTLE_CYCLE_DURATION;
-        uint256 nextCycleStart = battleStartTime + ((currentCycle + 1) * BATTLE_CYCLE_DURATION);
-        if (block.timestamp >= nextCycleStart) revert RevivalPeriodEnded();
-
-        // Get level from UnimonHook
-        UnimonHook.UnimonData memory unimonData = unimonHook.getUnimonData(tokenId);
-
-        // Calculate and burn revival cost
-        uint256 revivalCost = unimonData.level * (10 ** unimonEnergy.decimals());
-        unimonEnergy.burn(msg.sender, revivalCost);
-
-        // Revive Unimon
-        battleStats.status = BattleStatus.READY;
-        battleStats.reviveCount++;
-    }
-
-    function _resolveEncounter(uint256 id, Encounter storage enc) internal {
-        BattleData storage attackerBattle = battleData[enc.attacker];
-        BattleData storage defenderBattle = battleData[enc.defender];
-
-        // Get levels from UnimonHook
-        UnimonHook.UnimonData memory attackerData = unimonHook.getUnimonData(enc.attacker);
-        UnimonHook.UnimonData memory defenderData = unimonHook.getUnimonData(enc.defender);
-
-        uint256 roll = uint256(keccak256(abi.encodePacked(blockhash(block.number - 1), id))) % 100;
-        uint256 attackerOdds = (attackerData.level * 100) / (attackerData.level + defenderData.level);
-
-        (uint256 winnerId, uint256 loserId) = roll < attackerOdds
-            ? (enc.attacker, enc.defender)
-            : (enc.defender, enc.attacker);
-
-        battleData[loserId].status = BattleStatus.FAINTED;
-        attackerBattle.currentEncounterId = defenderBattle.currentEncounterId = 0;
-        attackerBattle.status = defenderBattle.status = BattleStatus.READY;
-        enc.resolved = true;
-        enc.winner = winnerId;
-
-        emit EncounterResolved(id, winnerId, loserId);
-    }
-
-    function resolveBattles(uint256 startId, uint256 endId) external onlyOwner {
-        require(cycleInResolution && startId <= endId && endId < nextEncounterId);
-        (uint256 currentCycle, , ) = getCurrentBattleCycle();
-        uint256 resolvedCount;
-
-        for (uint256 i = startId; i <= endId; ) {
-            Encounter storage enc = encounters[i];
-            if (enc.attacker != 0 && !enc.resolved && getEncounterCycle(i) < currentCycle) {
-                _resolveEncounter(i, enc);
-                resolvedCount++;
-            }
-            unchecked {
-                ++i;
-            }
-        }
-
-        if (resolvedCount == 0) revert NoEncountersInRange();
-    }
-
-    function resolveDailyCycle(uint256 maxTokenId) external onlyOwner {
-        require(battleTimeInitialized, "Battle time not initialized");
-        require(cycleInResolution, "Must be in resolution phase");
-
-        uint256 processedCount = 0;
-
-        for (uint256 i = 0; i < maxTokenId; i++) {
-            try unimonHook.getUnimonData(i) returns (UnimonHook.UnimonData memory nftData) {
-                if (nftData.status != UnimonHook.Status.HATCHED) {
-                    continue;
-                }
-
-                BattleData storage battleStats = battleData[i];
-
-                if (battleStats.status == BattleStatus.FAINTED) {
-                    battleStats.status = BattleStatus.DEAD;
-                    processedCount++;
-                } else if (battleStats.status == BattleStatus.READY && battleStats.currentEncounterId == 0) {
-                    battleStats.status = BattleStatus.FAINTED;
-                    processedCount++;
-                }
-            } catch {
-                continue;
-            }
-        }
-
-        require(processedCount > 0, "No Unimons processed");
-    }
-
-    function initializeBattleTime() external onlyOwner {
-        require(!battleTimeInitialized, "Battle time already initialized");
-        battleStartTime = block.timestamp;
-        battleTimeInitialized = true;
-    }
-
-    function setUnimonEnergy(address _unimonEnergy) external onlyOwner {
         unimonEnergy = UnimonEnergy(_unimonEnergy);
+        startTimestamp = _startTimestamp;
     }
 
-    function toggleCycleResolution() external onlyOwner {
-        require(battleTimeInitialized, "Battle time not initialized");
-        cycleInResolution = !cycleInResolution;
+    ///////////////////////////////////////////////////////////////////////////////
+    //                                                                           //
+    //                              View Functions                               //
+    //                                                                           //
+    ///////////////////////////////////////////////////////////////////////////////
+
+    function getCurrentCycleInfo() external view returns (uint256 cycleId, uint256 startTime, bool cycleComplete) {
+        uint256 cycle = getCurrentCycleNumber();
+        uint256 cycleStartTime = startTimestamp + ((cycle - 1) * CYCLE_DURATION);
+        return (cycle, cycleStartTime, cycles[cycle].cycleComplete);
+    }
+
+    function isWithinBattleWindow() public view returns (bool) {
+        if (block.timestamp < startTimestamp) return false;
+
+        uint256 timeElapsed = block.timestamp - startTimestamp;
+        uint256 currentCycleElapsed = timeElapsed % CYCLE_DURATION;
+        return currentCycleElapsed <= (CYCLE_DURATION - ADMIN_GRACE_PERIOD);
+    }
+
+    function getCurrentCycleNumber() public view returns (uint256) {
+        if (block.timestamp < startTimestamp) return 0;
+        return ((block.timestamp - startTimestamp) / CYCLE_DURATION) + 1;
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////
+    //                                                                           //
+    //                              User Functions                               //
+    //                                                                           //
+    ///////////////////////////////////////////////////////////////////////////////
+
+    function startBattle(uint256 attackerId, uint256 defenderId) external {
+        if (!isWithinBattleWindow()) revert OutsideBattleWindow();
+        if (!battleEnabled) revert BattlesNotEnabled();
+        ensureCycleInitialized();
+        if (attackerId == defenderId) revert InvalidBattleId();
+        if (msg.sender != unimonHook.ownerOf(attackerId)) revert NotOwner();
+
+        UnimonHook.UnimonData memory attackerUnimon = unimonHook.getUnimonData(attackerId);
+        UnimonHook.UnimonData memory defenderUnimon = unimonHook.getUnimonData(defenderId);
+        if (attackerUnimon.status != UnimonHook.Status.HATCHED || defenderUnimon.status != UnimonHook.Status.HATCHED)
+            revert NotHatched();
+
+        BattleData storage attackerData = unimonBattleData[attackerId];
+        BattleData storage defenderData = unimonBattleData[defenderId];
+
+        if (attackerData.status != BattleStatus.READY) revert NotReady();
+        if (defenderData.status != BattleStatus.READY) revert OpponentNotReady();
+
+        uint256 encounterId = ++currentEncounterId;
+        encounters[encounterId] = Encounter({
+            attacker: attackerId,
+            defender: defenderId,
+            resolved: false,
+            winner: 0,
+            timestamp: block.timestamp,
+            randomnessRequested: true,
+            randomnessFulfilled: false,
+            battleCycle: getCurrentCycleNumber(),
+            randomNumber: 0
+        });
+
+        attackerData.status = BattleStatus.IN_BATTLE;
+        attackerData.currentEncounterId = encounterId;
+        defenderData.status = BattleStatus.IN_BATTLE;
+        defenderData.currentEncounterId = encounterId;
+
+        emit EncounterStarted(
+            encounterId,
+            attackerId,
+            defenderId,
+            msg.sender,
+            unimonHook.ownerOf(defenderId),
+            block.timestamp
+        );
+        emit RandomnessRequested(encounterId, block.timestamp);
+    }
+
+    function finishThem(uint256 battleId) external {
+        if (!isWithinBattleWindow()) revert OutsideBattleWindow();
+        Encounter storage encounter = encounters[battleId];
+        if (!encounter.randomnessFulfilled) revert RandomnessNotFulfilled();
+        if (encounter.resolved) revert BattleNotResolved();
+
+        uint256 winner = selectWinner(battleId);
+        uint256 loser = winner == encounter.attacker ? encounter.defender : encounter.attacker;
+
+        encounter.resolved = true;
+        encounter.winner = winner;
+
+        // Simple status updates
+        unimonBattleData[winner].status = BattleStatus.WON;
+        unimonBattleData[loser].status = BattleStatus.LOST;
+
+        emit EncounterResolved(
+            battleId,
+            winner,
+            loser,
+            unimonHook.ownerOf(winner),
+            unimonHook.ownerOf(loser),
+            block.timestamp
+        );
+    }
+
+    function revive(uint256 unimonId) external {
+        BattleData storage data = unimonBattleData[unimonId];
+        if (data.status != BattleStatus.FAINTED) revert InvalidBattleState();
+        if (data.reviveCount >= MAX_REVIVES) revert TooManyRevives();
+
+        UnimonHook.UnimonData memory unimonData = unimonHook.getUnimonData(unimonId);
+        uint256 reviveCost = unimonData.level * 1 ether;
+
+        unimonEnergy.burn(msg.sender, reviveCost);
+
+        data.status = BattleStatus.READY;
+        data.reviveCount++;
+
+        emit UnimonRevived(unimonId, msg.sender, reviveCost, data.reviveCount, block.timestamp);
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////
+    //                                                                           //
+    //                             Internal Helper Functions                     //
+    //                                                                           //
+    ///////////////////////////////////////////////////////////////////////////////
+
+    function selectWinner(uint256 battleId) internal view returns (uint256) {
+        Encounter storage encounter = encounters[battleId];
+
+        UnimonHook.UnimonData memory attackerData = unimonHook.getUnimonData(encounter.attacker);
+        UnimonHook.UnimonData memory defenderData = unimonHook.getUnimonData(encounter.defender);
+
+        uint256 totalWeight = attackerData.level + defenderData.level;
+        uint256 randomValue = encounter.randomNumber % totalWeight;
+
+        return randomValue < attackerData.level ? encounter.attacker : encounter.defender;
+    }
+
+    function ensureCycleInitialized() internal {
+        uint256 cycle = getCurrentCycleNumber();
+        if (!cycleInitialized[cycle]) {
+            cycleInitialized[cycle] = true;
+            cycles[cycle].startTime = startTimestamp + ((cycle - 1) * CYCLE_DURATION);
+            cycles[cycle].cycleComplete = false;
+            emit CycleStarted(cycle, cycles[cycle].startTime);
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////
+    //                                                                           //
+    //                              Admin Functions                              //
+    //                                                                           //
+    ///////////////////////////////////////////////////////////////////////////////
+
+    function toggleBattles(bool enable) external onlyOwner {
+        battleEnabled = enable;
+    }
+
+    function fulfillRandomness(uint256[] calldata battleIds, uint256[] calldata randomNumbers) external onlyOwner {
+        require(battleIds.length == randomNumbers.length, "Length mismatch");
+        for (uint256 i = 0; i < battleIds.length; i++) {
+            Encounter storage encounter = encounters[battleIds[i]];
+            if (!encounter.randomnessRequested || encounter.randomnessFulfilled) continue;
+
+            encounter.randomNumber = uint256(keccak256(abi.encodePacked(randomNumbers[i], battleIds[i])));
+            encounter.randomnessFulfilled = true;
+            emit RandomnessFulfilled(battleIds[i], block.timestamp);
+        }
+    }
+
+    function resolveAnyIncompleteBattles(uint256 startId, uint256 endId) external onlyOwner {
+        require(startId <= endId && endId <= currentEncounterId, "Invalid encounter range");
+
+        for (uint256 i = startId; i <= endId; i++) {
+            Encounter storage encounter = encounters[i];
+            if (encounter.battleCycle != getCurrentCycleNumber()) continue;
+            if (encounter.resolved) continue;
+            if (!encounter.randomnessFulfilled) continue;
+
+            uint256 winner = selectWinner(i);
+            uint256 loser = winner == encounter.attacker ? encounter.defender : encounter.attacker;
+
+            encounter.resolved = true;
+            encounter.winner = winner;
+
+            unimonBattleData[winner].status = BattleStatus.WON;
+            unimonBattleData[loser].status = BattleStatus.LOST;
+
+            emit EncounterResolved(
+                i,
+                winner,
+                loser,
+                unimonHook.ownerOf(winner),
+                unimonHook.ownerOf(loser),
+                block.timestamp
+            );
+        }
+    }
+
+    function updateStatusesForNextCycle(uint256 startId, uint256 endId) external onlyOwner {
+        if (isWithinBattleWindow()) revert BattleWindowActive();
+
+        require(startId <= endId && endId <= currentEncounterId, "Invalid encounter range");
+
+        for (uint256 i = startId; i <= endId; i++) {
+            BattleData storage data = unimonBattleData[i];
+
+            if (data.status == BattleStatus.READY) {
+                data.status = BattleStatus.FAINTED;
+            } else if (data.status == BattleStatus.WON) {
+                data.status = BattleStatus.READY;
+            } else if (data.status == BattleStatus.LOST) {
+                data.status = BattleStatus.FAINTED;
+            } else if (data.status == BattleStatus.FAINTED) {
+                data.status = BattleStatus.DEAD;
+            }
+        }
     }
 }
