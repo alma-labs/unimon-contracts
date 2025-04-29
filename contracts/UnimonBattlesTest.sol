@@ -6,12 +6,12 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {UnimonEnergy} from "./UnimonEnergy.sol";
 import {UnimonHook} from "./UnimonHook.sol";
 
-contract UnimonBattles is AccessControl {
+contract UnimonBattlesTest is AccessControl {
     bytes32 public constant RANDOMNESS_ROLE = keccak256("RANDOMNESS_ROLE");
 
     uint256 public constant MAX_REVIVES = 2;
-    uint256 public constant CYCLE_DURATION = 24 hours;
-    uint256 public constant ADMIN_GRACE_PERIOD = 1 hours;
+    uint256 public constant CYCLE_DURATION = 1 hours;
+    uint256 public constant ADMIN_GRACE_PERIOD = 10 minutes;
 
     uint256 public startTimestamp;
     UnimonEnergy public unimonEnergy;
@@ -172,6 +172,9 @@ contract UnimonBattles is AccessControl {
         if (defenderData.status != BattleStatus.READY) revert OpponentNotReady();
 
         uint256 encounterId = ++currentEncounterId;
+        uint256 randomNumber = uint256(
+            keccak256(abi.encodePacked(blockhash(block.number - 1), block.timestamp, msg.sender, encounterId))
+        );
         encounters[encounterId] = Encounter({
             attacker: attackerId,
             defender: defenderId,
@@ -179,9 +182,9 @@ contract UnimonBattles is AccessControl {
             winner: 0,
             timestamp: block.timestamp,
             randomnessRequested: true,
-            randomnessFulfilled: false,
+            randomnessFulfilled: true,
             battleCycle: getCurrentCycleNumber(),
-            randomNumber: 0
+            randomNumber: randomNumber
         });
 
         attackerData.status = BattleStatus.IN_BATTLE;
@@ -198,6 +201,7 @@ contract UnimonBattles is AccessControl {
             block.timestamp
         );
         emit RandomnessRequested(encounterId, block.timestamp);
+        emit RandomnessFulfilled(encounterId, block.timestamp);
     }
 
     function finishThem(uint256 battleId) external {
@@ -283,21 +287,6 @@ contract UnimonBattles is AccessControl {
 
     function toggleBattles(bool enable) external onlyRole(DEFAULT_ADMIN_ROLE) {
         battleEnabled = enable;
-    }
-
-    function fulfillRandomness(
-        uint256[] calldata battleIds,
-        uint256[] calldata randomNumbers
-    ) external onlyRole(RANDOMNESS_ROLE) {
-        require(battleIds.length == randomNumbers.length, "Length mismatch");
-        for (uint256 i = 0; i < battleIds.length; i++) {
-            Encounter storage encounter = encounters[battleIds[i]];
-            if (!encounter.randomnessRequested || encounter.randomnessFulfilled) continue;
-
-            encounter.randomNumber = uint256(keccak256(abi.encodePacked(randomNumbers[i], battleIds[i])));
-            encounter.randomnessFulfilled = true;
-            emit RandomnessFulfilled(battleIds[i], block.timestamp);
-        }
     }
 
     function resolveAnyIncompleteBattles(uint256 startId, uint256 endId) external onlyRole(DEFAULT_ADMIN_ROLE) {

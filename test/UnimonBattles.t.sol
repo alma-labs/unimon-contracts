@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
+import {console2} from "forge-std/console2.sol";
 import "../contracts/UnimonBattles.sol";
 import "../contracts/UnimonEnergy.sol";
 import {UnimonHook as MockUnimonHook} from "../contracts/mock/CoreGameLogic.sol";
@@ -145,8 +146,8 @@ contract UnimonBattlesTest is Test, IERC721Receiver {
         battles.finishThem(1);
 
         // Get battle data
-        (UnimonBattles.BattleStatus status1, , , uint256 encounterId1) = battles.unimonBattleData(0);
-        (UnimonBattles.BattleStatus status2, , , uint256 encounterId2) = battles.unimonBattleData(5);
+        (UnimonBattles.BattleStatus status1, , uint256 encounterId1) = battles.unimonBattleData(0);
+        (UnimonBattles.BattleStatus status2, , uint256 encounterId2) = battles.unimonBattleData(5);
 
         // Assert one won and one lost
         assertTrue(
@@ -162,27 +163,29 @@ contract UnimonBattlesTest is Test, IERC721Receiver {
         _setupMultiPlayerBattles();
         _warpToBattleStart();
 
-        // Calculate time for first cycle + 23 hours + 1 minute (outside battle window)
-        uint256 battleWindowEnd = block.timestamp + (23 hours + 1 minutes);
-        vm.warp(battleWindowEnd);
+        // Warp to outside battle window to set status
+        vm.warp(block.timestamp + (CYCLE_DURATION - (ADMIN_GRACE_PERIOD - 1)));
 
         // Set Unimon to FAINTED status
         vm.startPrank(owner);
         battles.updateStatusesForNextCycle(0, 0);
         vm.stopPrank();
 
+        // Warp back to battle window
+        _warpToBattleStart();
+
         vm.startPrank(player1);
         battles.revive(0);
         vm.stopPrank();
 
         // Check status is READY
-        (UnimonBattles.BattleStatus status, , , ) = battles.unimonBattleData(0);
+        (UnimonBattles.BattleStatus status, , ) = battles.unimonBattleData(0);
         assertEq(uint256(status), uint256(UnimonBattles.BattleStatus.READY));
     }
 
     function test_MultiPlayerSetup() public {
         _setupMultiPlayerBattles();
-        
+
         // Verify player1's Unimons (tokenIncrement 1-2)
         assertEq(hook.ownerOf(0), player1);
         (, uint256 level0) = hook.unimons(0);
