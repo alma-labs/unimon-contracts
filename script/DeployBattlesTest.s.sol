@@ -2,7 +2,8 @@
 pragma solidity 0.8.26;
 
 import {Script} from "forge-std/Script.sol";
-import {UnimonBattlesTest as UnimonBattles} from "../contracts/UnimonBattlesTest.sol"; // TODO: Change to UnimonBattles
+//import {UnimonBattlesTest as UnimonBattles} from "../contracts/UnimonBattlesTest.sol"; // TODO: Change to UnimonBattles
+import {UnimonBattles} from "../contracts/UnimonBattles.sol";
 import {UnimonEnergy} from "../contracts/UnimonEnergy.sol";
 
 contract DeployBattlesTest is Script {
@@ -12,14 +13,14 @@ contract DeployBattlesTest is Script {
         //address unimonHook = 0x7F7d7E4a9D4DA8997730997983C5Ca64846868C0; // Real Hook
         address unimonHook = 0x32DC0294Ef0Bc29dd76d49D2A3Cdd6B99354d849; // Test Hook
         address unimonEnergy = 0xB75Ef5F073d2D40BF22D0328360a002F458E07d2; // Test UnimonEnergy
-        uint256 startTimestamp = 1745935200;
+        uint256 startTimestamp = 1746025200;
 
         UnimonBattles battles = new UnimonBattles(unimonHook, unimonEnergy, startTimestamp);
 
         //Basic Setup
         UnimonEnergy(unimonEnergy).setGameManager(address(battles), true);
         battles.toggleBattles(true);
-        battles.killUnhatched(0, 200);
+        battles.killUnhatched(0, 300);
 
         // Assign randomness roles
         battles.grantRole(battles.RANDOMNESS_ROLE(), 0xa205537dc7096852AF727026dCEAA2087dAAdbfe);

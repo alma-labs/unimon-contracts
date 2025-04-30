@@ -10,8 +10,8 @@ contract UnimonBattles is AccessControl {
     bytes32 public constant RANDOMNESS_ROLE = keccak256("RANDOMNESS_ROLE");
 
     uint256 public constant MAX_REVIVES = 2;
-    uint256 public constant CYCLE_DURATION = 24 hours;
-    uint256 public constant ADMIN_GRACE_PERIOD = 1 hours;
+    uint256 public constant CYCLE_DURATION = 1 hours;
+    uint256 public constant ADMIN_GRACE_PERIOD = 10 minutes;
 
     uint256 public startTimestamp;
     UnimonEnergy public unimonEnergy;
@@ -64,7 +64,8 @@ contract UnimonBattles is AccessControl {
         uint256 indexed defenderId,
         address attackerPlayer,
         address defenderPlayer,
-        uint256 timestamp
+        uint256 timestamp,
+        uint256 battleCycle
     );
     event EncounterResolved(
         uint256 indexed encounterId,
@@ -72,7 +73,8 @@ contract UnimonBattles is AccessControl {
         uint256 indexed loserId,
         address winnerPlayer,
         address loserPlayer,
-        uint256 timestamp
+        uint256 timestamp,
+        uint256 battleCycle
     );
     event CycleCompleted(uint256 indexed cycleId);
     event UnimonRevived(
@@ -80,10 +82,11 @@ contract UnimonBattles is AccessControl {
         address indexed player,
         uint256 reviveCost,
         uint256 newReviveCount,
-        uint256 timestamp
+        uint256 timestamp,
+        uint256 battleCycle
     );
-    event RandomnessRequested(uint256 indexed encounterId, uint256 timestamp);
-    event RandomnessFulfilled(uint256 indexed encounterId, uint256 timestamp);
+    event RandomnessRequested(uint256 indexed encounterId, uint256 timestamp, uint256 battleCycle);
+    event RandomnessFulfilled(uint256 indexed encounterId, uint256 timestamp, uint256 battleCycle);
 
     error NotOwner();
     error NotHatched();
@@ -154,7 +157,8 @@ contract UnimonBattles is AccessControl {
     ///////////////////////////////////////////////////////////////////////////////
 
     function startBattle(uint256 attackerId, uint256 defenderId) external {
-        if (!isWithinBattleWindow()) revert OutsideBattleWindow();
+        bool isWindowActive = isWithinBattleWindow();
+        if (!isWindowActive) revert OutsideBattleWindow();
         if (!battleEnabled) revert BattlesNotEnabled();
         _ensureCycleInitialized();
         if (attackerId == defenderId) revert InvalidBattleId();
@@ -172,6 +176,7 @@ contract UnimonBattles is AccessControl {
         if (defenderData.status != BattleStatus.READY) revert OpponentNotReady();
 
         uint256 encounterId = ++currentEncounterId;
+        uint256 currentCycle = getCurrentCycleNumber();
         encounters[encounterId] = Encounter({
             attacker: attackerId,
             defender: defenderId,
@@ -180,7 +185,7 @@ contract UnimonBattles is AccessControl {
             timestamp: block.timestamp,
             randomnessRequested: true,
             randomnessFulfilled: false,
-            battleCycle: getCurrentCycleNumber(),
+            battleCycle: currentCycle,
             randomNumber: 0
         });
 
@@ -195,9 +200,10 @@ contract UnimonBattles is AccessControl {
             defenderId,
             msg.sender,
             unimonHook.ownerOf(defenderId),
-            block.timestamp
+            block.timestamp,
+            currentCycle
         );
-        emit RandomnessRequested(encounterId, block.timestamp);
+        emit RandomnessRequested(encounterId, block.timestamp, currentCycle);
     }
 
     function finishThem(uint256 battleId) external {
@@ -210,7 +216,8 @@ contract UnimonBattles is AccessControl {
     }
 
     function revive(uint256 unimonId) external {
-        if (!isWithinBattleWindow()) revert OutsideBattleWindow();
+        bool isWindowActive = isWithinBattleWindow();
+        if (!isWindowActive) revert OutsideBattleWindow();
         BattleData storage data = unimonBattleData[unimonId];
         if (data.status != BattleStatus.FAINTED) revert InvalidBattleState();
         if (data.reviveCount >= MAX_REVIVES) revert TooManyRevives();
@@ -223,7 +230,8 @@ contract UnimonBattles is AccessControl {
         data.status = BattleStatus.READY;
         data.reviveCount++;
 
-        emit UnimonRevived(unimonId, msg.sender, reviveCost, data.reviveCount, block.timestamp);
+        uint256 currentCycle = getCurrentCycleNumber();
+        emit UnimonRevived(unimonId, msg.sender, reviveCost, data.reviveCount, block.timestamp, currentCycle);
     }
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -271,7 +279,8 @@ contract UnimonBattles is AccessControl {
             loser,
             unimonHook.ownerOf(winner),
             unimonHook.ownerOf(loser),
-            block.timestamp
+            block.timestamp,
+            getCurrentCycleNumber()
         );
     }
 
@@ -290,13 +299,14 @@ contract UnimonBattles is AccessControl {
         uint256[] calldata randomNumbers
     ) external onlyRole(RANDOMNESS_ROLE) {
         require(battleIds.length == randomNumbers.length, "Length mismatch");
+        uint256 currentCycle = getCurrentCycleNumber();
         for (uint256 i = 0; i < battleIds.length; i++) {
             Encounter storage encounter = encounters[battleIds[i]];
             if (!encounter.randomnessRequested || encounter.randomnessFulfilled) continue;
 
             encounter.randomNumber = uint256(keccak256(abi.encodePacked(randomNumbers[i], battleIds[i])));
             encounter.randomnessFulfilled = true;
-            emit RandomnessFulfilled(battleIds[i], block.timestamp);
+            emit RandomnessFulfilled(battleIds[i], block.timestamp, currentCycle);
         }
     }
 
@@ -313,7 +323,8 @@ contract UnimonBattles is AccessControl {
     }
 
     function updateStatusesForNextCycle(uint256 startId, uint256 endId) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (isWithinBattleWindow()) revert BattleWindowActive();
+        bool isWindowActive = isWithinBattleWindow();
+        if (isWindowActive) revert BattleWindowActive();
 
         for (uint256 i = startId; i <= endId; i++) {
             BattleData storage data = unimonBattleData[i];
