@@ -33,6 +33,7 @@ This is a foundry repository containing the hook & auxillary contracts needed to
 
 #### Battle Initialization
 
+MAKE SURE TIMING IS SET UP RIGHT (START TIME AND CYCLE TIME)
 0. Give any operational addresses the ability to fulfill randomness.
 1. Call `setGameManager` on UMN contract with Battles contract (done in script)
 2. Call `killUnhatched` for all IDs in circulation (batches of 1000)

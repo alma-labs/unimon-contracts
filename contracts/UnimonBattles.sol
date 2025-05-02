@@ -10,8 +10,8 @@ contract UnimonBattles is AccessControl {
     bytes32 public constant RANDOMNESS_ROLE = keccak256("RANDOMNESS_ROLE");
 
     uint256 public constant MAX_REVIVES = 2;
-    uint256 public constant CYCLE_DURATION = 1 hours;
-    uint256 public constant ADMIN_GRACE_PERIOD = 10 minutes;
+    uint256 public constant CYCLE_DURATION = 24 hours;
+    uint256 public constant ADMIN_GRACE_PERIOD = 1 hours;
 
     uint256 public startTimestamp;
     UnimonEnergy public unimonEnergy;
@@ -316,16 +316,17 @@ contract UnimonBattles is AccessControl {
         for (uint256 i = startId; i <= endId; i++) {
             Encounter storage encounter = encounters[i];
             if (encounter.resolved) continue;
-            if (!encounter.randomnessFulfilled) continue;
+            if (!encounter.randomnessFulfilled) {
+                encounter.randomNumber = uint256(keccak256(abi.encodePacked(block.timestamp, block.prevrandao, i)));
+                encounter.randomnessFulfilled = true;
+                emit RandomnessFulfilled(i, block.timestamp, encounter.battleCycle);
+            }
 
             _resolveBattle(i);
         }
     }
 
     function updateStatusesForNextCycle(uint256 startId, uint256 endId) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        bool isWindowActive = isWithinBattleWindow();
-        if (isWindowActive) revert BattleWindowActive();
-
         for (uint256 i = startId; i <= endId; i++) {
             BattleData storage data = unimonBattleData[i];
 
