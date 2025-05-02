@@ -348,6 +348,12 @@ contract UnimonBattles is AccessControl {
         emit CycleCompleted(cycleId);
     }
 
+    function bulkGrantRandomness(address[] calldata addresses) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        for (uint256 i = 0; i < addresses.length; i++) {
+            _grantRole(RANDOMNESS_ROLE, addresses[i]);
+        }
+    }
+
     function killUnhatched(uint256 startId, uint256 endId) external onlyRole(DEFAULT_ADMIN_ROLE) {
         for (uint256 i = startId; i <= endId; i++) {
             try unimonHook.getUnimonData(i) returns (UnimonHook.UnimonData memory data) {
@@ -357,6 +363,17 @@ contract UnimonBattles is AccessControl {
             } catch {
                 continue;
             }
+        }
+    }
+
+    function bulkUpdateBattleStates(
+        uint256[] calldata unimonIds,
+        BattleStatus[] calldata newStates
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(unimonIds.length == newStates.length, "Length mismatch");
+
+        for (uint256 i = 0; i < unimonIds.length; i++) {
+            unimonBattleData[unimonIds[i]].status = newStates[i];
         }
     }
 }

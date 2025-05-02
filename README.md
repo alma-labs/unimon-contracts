@@ -37,6 +37,7 @@ This is a foundry repository containing the hook & auxillary contracts needed to
 1. Call `setGameManager` on UMN contract with Battles contract (done in script)
 2. Call `killUnhatched` for all IDs in circulation (batches of 1000)
 3. Toggle `toggleBattles(true)` to enable battles.
+4. Update & Swap out GhostGraph & contract(s) in API.
 
 #### Battle Management
 
