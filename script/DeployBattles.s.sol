@@ -5,14 +5,13 @@ import {Script} from "forge-std/Script.sol";
 import {UnimonBattles} from "../contracts/UnimonBattles.sol";
 import {UnimonEnergy} from "../contracts/UnimonEnergy.sol";
 
-contract DeployBattlesTest is Script {
+contract DeployBattles is Script {
     function run() public {
         vm.startBroadcast(vm.envUint("DEPLOYER_KEY"));
 
-        address unimonHook = 0x7F7d7E4a9D4DA8997730997983C5Ca64846868C0; // Real Hook
-        // address unimonHook = 0x32DC0294Ef0Bc29dd76d49D2A3Cdd6B99354d849; // Test Hook
-        address unimonEnergy = 0xB75Ef5F073d2D40BF22D0328360a002F458E07d2; // Test UnimonEnergy
-        uint256 startTimestamp = 1746453600;
+        address unimonHook = 0x7F7d7E4a9D4DA8997730997983C5Ca64846868C0;
+        address unimonEnergy = 0x7eDc481366A345D7F9fCEcB207408b5f2887fF99;
+        uint256 startTimestamp = 1746576000;
 
         UnimonBattles battles = new UnimonBattles(unimonHook, unimonEnergy, startTimestamp);
 
@@ -23,7 +22,7 @@ contract DeployBattlesTest is Script {
         // battles.killUnhatched(1000, 1999);
         // battles.killUnhatched(2000, 2999);
         // battles.killUnhatched(3000, 3999);
-        // battles.killUnhatched(4000, 4999);
+        // battles.killUnhatched(4000, 5003);
 
         // Assign randomness roles
         address[] memory randomnessProviders = new address[](10);

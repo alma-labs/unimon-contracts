@@ -21,22 +21,22 @@ This is a foundry repository containing the hook & auxillary contracts needed to
 
 - `forge test` run Foundry tests
 - `forge build` compile Foundry contracts
-- `npm run deploy:<hook || energy || registry>`
+- `npm run deploy:<hook || energy || registry || battles>`
 
 ## Deployed Contracts
 
 - [UnimonEnergy](https://uniscan.xyz/address/0x7edc481366a345d7f9fcecb207408b5f2887ff99)
 - [UnimonHook](https://uniscan.xyz/address/0x7f7d7e4a9d4da8997730997983c5ca64846868c0)
-- [UserRegistry](https://uniscan.xyz/address/0xb11749d5392f1a3ed18f42dd2e438348d9e5c0d4)
+- [UnimonBattles](https://uniscan.xyz/address/0xebc5e87691a335747c9a516cd31abe6fbe584866)
 
 ## Battle Management
 
 #### Battle Initialization
 
-MAKE SURE TIMING IS SET UP RIGHT (START TIME AND CYCLE TIME)
-0. Give any operational addresses the ability to fulfill randomness.
+MAKE SURE TIMING IS SET UP RIGHT (START TIME AND CYCLE TIME) 0. Give any operational addresses the ability to fulfill randomness.
+
 1. Call `setGameManager` on UMN contract with Battles contract (done in script)
-2. Call `killUnhatched` for all IDs in circulation (batches of 1000)
+2. Call `killUnhatched` for all IDs in circulation (batches of 1000, up to 5003)
 3. Toggle `toggleBattles(true)` to enable battles.
 4. Update & Swap out GhostGraph & contract(s) in API.
 
@@ -45,7 +45,7 @@ MAKE SURE TIMING IS SET UP RIGHT (START TIME AND CYCLE TIME)
 In the grace period...
 
 1. Run `resolveAnyIncompleteBattles` over a range of encounters to select winners (batches of 1000).
-2. Run `updateStatusesForNextCycle` over a range of all Unimon (batches of 1000).
+2. Run `updateStatusesForNextCycle` over a range of all Unimon (batches of 1000, up to 5003).
 3. Mark `completedCycle` to mark them all as true.
 
 ## 📝 Important Notes
