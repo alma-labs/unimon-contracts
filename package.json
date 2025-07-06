@@ -5,18 +5,19 @@
     "deploy:hook": "source .env && forge script script/DeployHook.s.sol:DeployHook --rpc-url https://mainnet.unichain.org --broadcast --verify --verifier etherscan --verifier-url https://api.uniscan.xyz/api --etherscan-api-key $UNICHAIN_API_KEY",
     "deploy:registry": "source .env && forge script script/DeployUserRegistry.s.sol:DeployUserRegistry --rpc-url https://mainnet.unichain.org --broadcast --verify --verifier etherscan --verifier-url https://api.uniscan.xyz/api --etherscan-api-key $UNICHAIN_API_KEY",
     "deploy:battles": "source .env && forge script script/DeployBattles.s.sol:DeployBattles --rpc-url https://mainnet.unichain.org --broadcast --verify --verifier etherscan --verifier-url https://api.uniscan.xyz/api --etherscan-api-key $UNICHAIN_API_KEY",
+    "deploy:prizes": "source .env && forge script script/DeployPrizes.s.sol:DeployPrizes --rpc-url https://mainnet.unichain.org --broadcast --verify --verifier etherscan --verifier-url https://api.uniscan.xyz/api --etherscan-api-key $UNICHAIN_API_KEY",
     "swap": "hardhat run script/swap-script-unichain.ts --network unichain"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^5.2.0",
+    "@openzeppelin/contracts": "^5.3.0",
     "@uniswap/v4-core": "^1.0.1",
     "dotenv": "^16.4.5",
     "viem": "^2.23.11"
   },
   "devDependencies": {
-    "@types/node": "^22.13.14",
     "@nomicfoundation/hardhat-foundry": "^1.1.2",
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@types/node": "^22.13.14",
     "hardhat": "^2.22.8"
   }
 }
