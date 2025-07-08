@@ -2,8 +2,8 @@
 pragma solidity 0.8.26;
 
 import {Script} from "forge-std/Script.sol";
-import {UnimonBattles} from "../contracts/UnimonBattles.sol";
-import {UnimonEnergy} from "../contracts/UnimonEnergy.sol";
+import {UnimonBattles} from "../../contracts/v1/UnimonBattles.sol";
+import {UnimonEnergy} from "../../contracts/v1/UnimonEnergy.sol";
 
 contract DeployBattles is Script {
     function run() public {

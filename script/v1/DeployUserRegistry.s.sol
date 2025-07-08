@@ -2,12 +2,12 @@
 pragma solidity 0.8.26;
 
 import {Script} from "forge-std/Script.sol";
-import {UnimonEnergy} from "../contracts/UnimonEnergy.sol";
+import {UnimonUserRegistry} from "../../contracts/v1/UnimonUserRegistry.sol";
 
-contract DeployEnergy is Script {
+contract DeployUserRegistry is Script {
     function run() public {
         vm.startBroadcast(vm.envUint("DEPLOYER_KEY"));
-        new UnimonEnergy();
+        new UnimonUserRegistry();
         vm.stopBroadcast();
     }
 }

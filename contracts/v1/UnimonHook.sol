@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {BaseHook, Hooks, IPoolManager, PoolKey} from "../lib/uniswap-hooks/src/base/BaseHook.sol";
+import {BaseHook, Hooks, IPoolManager, PoolKey} from "../../lib/uniswap-hooks/src/base/BaseHook.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
