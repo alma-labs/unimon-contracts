@@ -97,6 +97,7 @@ contract UnimonV2 is ERC721, ERC721Enumerable, AccessControl, ERC721Burnable {
     function evolve(uint256 tokenId, uint256 energyAmount) external {
         require(ownerOf(tokenId) == msg.sender, "You don't own this Unimon");
         require(energyAmount >= 1 && energyAmount <= 10, "Energy amount must be 1-10");
+        require(!unimonStats[tokenId].evolved, "Unimon already evolved");
 
         uint256 energyId = unimonItems.ENERGY_ID();
         require(unimonItems.balanceOf(msg.sender, energyId) > 0, "Insufficient energy");

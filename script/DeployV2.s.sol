@@ -6,9 +6,12 @@ import {console} from "forge-std/console.sol";
 import {UnimonV2} from "../contracts/v2/UnimonV2.sol";
 import {UnimonItems} from "../contracts/v2/UnimonItems.sol";
 import {UnimonMinter} from "../contracts/v2/UnimonMinter.sol";
-import {UnimonGacha} from "../contracts/v2/UnimonGacha.sol";
+import {UnimonGachaSimple} from "../contracts/v2/UnimonGachaSimple.sol";
 
 contract DeployV2 is Script {
+    uint256[] public GACHA_ITEM_IDS = [3, 4, 5, 6];
+    uint256[] public GACHA_WEIGHTS = [40, 30, 20, 10];
+
     function run() public {
         address deployer = vm.addr(vm.envUint("DEPLOYER_KEY"));
         vm.startBroadcast(vm.envUint("DEPLOYER_KEY"));
@@ -22,7 +25,10 @@ contract DeployV2 is Script {
         // 3. Deploy UnimonMinter
         UnimonMinter minter = new UnimonMinter(address(nfts), address(items), deployer);
 
-        // 4. Set up permissions
+        // 4. Deploy UnimonGachaSimple
+        UnimonGachaSimple gacha = new UnimonGachaSimple(address(items));
+
+        // 5. Set up permissions
         // Give minter permission to mint NFTs
         nfts.grantRole(nfts.MINTER_ROLE(), address(minter));
 
@@ -35,11 +41,22 @@ contract DeployV2 is Script {
         // Give NFT contract permission to spend items (for evolution)
         items.grantSpenderRole(address(nfts));
 
+        // Give gacha permission to mint items (rewards)
+        items.grantMinterRole(address(gacha));
+
+        // Give gacha permission to spend items (keys)
+        items.grantSpenderRole(address(gacha));
+
+        // 6. Configure gacha with item IDs and weights
+        gacha.updateGacha(GACHA_ITEM_IDS, GACHA_WEIGHTS);
+
         vm.stopBroadcast();
 
         // Log deployed addresses
         console.log("UnimonItems deployed at:", address(items));
         console.log("UnimonV2 deployed at:", address(nfts));
         console.log("UnimonMinter deployed at:", address(minter));
+        console.log("UnimonGachaSimple deployed at:", address(gacha));
+        console.log("Gacha configured with", GACHA_ITEM_IDS.length, "items");
     }
 }
