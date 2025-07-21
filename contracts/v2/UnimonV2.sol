@@ -5,6 +5,7 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {ERC721Burnable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import {ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {UnimonItems} from "./UnimonItems.sol";
 
 contract UnimonV2 is ERC721, ERC721Enumerable, AccessControl, ERC721Burnable {
@@ -40,7 +41,9 @@ contract UnimonV2 is ERC721, ERC721Enumerable, AccessControl, ERC721Burnable {
     function safeMint(address to) public onlyRole(MINTER_ROLE) returns (uint256) {
         uint256 tokenId = _nextTokenId++;
         _safeMint(to, tokenId);
-        unimonStats[tokenId] = UnimonStats({attackLevel: 1, defenseLevel: 1, evolved: false, name: ""});
+
+        string memory defaultName = string(abi.encodePacked("Unimon #", Strings.toString(tokenId)));
+        unimonStats[tokenId] = UnimonStats({attackLevel: 1, defenseLevel: 1, evolved: false, name: defaultName});
 
         return tokenId;
     }

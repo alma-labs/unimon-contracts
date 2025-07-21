@@ -14,7 +14,11 @@ contract UnimonGacha is AccessControl, ReentrancyGuard {
     uint256[] public weights;
     uint256 public totalWeight;
     uint256 public maxBulkOperations = 50;
+    uint256[] public backupItemIds = [9, 10, 11];
+    uint256 private backupIndex = 0;
 
+    mapping(uint256 => uint256) public maxSupply;
+    mapping(uint256 => uint256) public currentSupply;
     mapping(address => bool) public pendingGacha;
     mapping(address => uint256) public pendingAmount;
     mapping(address => uint256) public requestedRandomness;
@@ -50,6 +54,14 @@ contract UnimonGacha is AccessControl, ReentrancyGuard {
         return (itemIds, weights, totalWeight);
     }
 
+    function getSupplyInfo(uint256 itemId) external view returns (uint256 current, uint256 max) {
+        return (currentSupply[itemId], maxSupply[itemId]);
+    }
+
+    function getBackupItemIds() external view returns (uint256[] memory) {
+        return backupItemIds;
+    }
+
     /*
         USER FUNCTIONS
     */
@@ -83,7 +95,18 @@ contract UnimonGacha is AccessControl, ReentrancyGuard {
         uint256[] memory amounts_ = new uint256[](amount);
 
         for (uint256 i = 0; i < amount; i++) {
-            itemIds_[i] = _getRandomItem(randomness, i);
+            uint256 selectedItemId = _getRandomItem(randomness, i);
+
+            // Check if item has reached max supply
+            if (maxSupply[selectedItemId] > 0 && currentSupply[selectedItemId] >= maxSupply[selectedItemId]) {
+                // Use backup item
+                uint256 backupItemId = _getNextBackupItem();
+                itemIds_[i] = backupItemId;
+                currentSupply[backupItemId]++;
+            } else {
+                itemIds_[i] = selectedItemId;
+                currentSupply[selectedItemId]++;
+            }
             amounts_[i] = 1;
         }
 
@@ -108,6 +131,12 @@ contract UnimonGacha is AccessControl, ReentrancyGuard {
         }
 
         return itemIds[0];
+    }
+
+    function _getNextBackupItem() internal returns (uint256) {
+        uint256 backupItemId = backupItemIds[backupIndex % backupItemIds.length];
+        backupIndex++;
+        return backupItemId;
     }
 
     /*
@@ -136,6 +165,24 @@ contract UnimonGacha is AccessControl, ReentrancyGuard {
         totalWeight = _totalWeight;
 
         emit GachaUpdated(_itemIds, _weights);
+    }
+
+    function setMaxSupply(
+        uint256[] memory _itemIds,
+        uint256[] memory _maxSupplies
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_itemIds.length == _maxSupplies.length, "Array length mismatch");
+        require(_itemIds.length > 0, "Empty arrays");
+
+        for (uint256 i = 0; i < _itemIds.length; i++) {
+            maxSupply[_itemIds[i]] = _maxSupplies[i];
+        }
+    }
+
+    function setBackupItemIds(uint256[] memory _backupItemIds) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_backupItemIds.length > 0, "Empty backup items array");
+        backupItemIds = _backupItemIds;
+        backupIndex = 0;
     }
 
     function setMaxBulkOperations(uint256 _max) external onlyRole(DEFAULT_ADMIN_ROLE) {

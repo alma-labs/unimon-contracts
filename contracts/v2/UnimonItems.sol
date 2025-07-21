@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 contract UnimonItems is ERC1155, AccessControl, ERC1155Burnable, ERC1155Supply {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant SPENDER_ROLE = keccak256("SPENDER_ROLE");
+    bytes32 public constant EQUIPMENT_ROLE = keccak256("EQUIPMENT_ROLE");
 
     uint256 public constant ENERGY_ID = 0;
     uint256 public constant UNIKEY_ID = 1;
@@ -111,6 +112,19 @@ contract UnimonItems is ERC1155, AccessControl, ERC1155Burnable, ERC1155Supply {
 
     function grantSpenderRole(address spender) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _grantRole(SPENDER_ROLE, spender);
+    }
+
+    function whitelistTransfer(address from, address to, uint256 id, uint256 amount) external onlyRole(EQUIPMENT_ROLE) {
+        _safeTransferFrom(from, to, id, amount, "");
+    }
+
+    function whitelistBatchTransfer(
+        address from,
+        address to,
+        uint256[] memory ids,
+        uint256[] memory amounts
+    ) external onlyRole(EQUIPMENT_ROLE) {
+        _safeBatchTransferFrom(from, to, ids, amounts, "");
     }
 
     /*

@@ -42,7 +42,7 @@ contract UnimonMinterTest is Test {
     }
 
     function testInitialState() public view {
-        assertEq(minter.MINT_PRICE(), 0.0111 ether);
+        assertEq(minter.MINT_PRICE(), 0.0000111 ether);
         assertEq(minter.MAX_MINT_PER_TX(), 100);
         assertEq(minter.totalMinted(), 0);
     }

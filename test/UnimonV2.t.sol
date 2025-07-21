@@ -53,7 +53,7 @@ contract UnimonV2Test is Test {
         assertEq(attack, 1);
         assertEq(defense, 1);
         assertEq(evolved, false);
-        assertEq(bytes(name).length, 0);
+        assertEq(name, "Unimon #0"); // Default name should be "Unimon #TOKENID"
     }
 
     function testMultipleMints() public {
@@ -87,7 +87,7 @@ contract UnimonV2Test is Test {
         assertEq(attack, 4); // 1 + 3
         assertEq(defense, 4); // 1 + 3
         assertEq(evolved, true);
-        assertEq(bytes(name).length, 0);
+        assertEq(name, "Unimon #0"); // Name should still be default after evolution
 
         // Check energy was spent
         assertEq(items.balanceOf(user, items.ENERGY_ID()), 9);
@@ -113,6 +113,7 @@ contract UnimonV2Test is Test {
             uint256[] memory attackLevels,
             uint256[] memory defenseLevels,
             bool[] memory evolvedStates,
+
         ) = unimon.getAllUnimonForAddress(user);
 
         assertEq(tokenIds.length, 2);
