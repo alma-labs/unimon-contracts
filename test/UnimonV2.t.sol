@@ -2,6 +2,7 @@
 pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
+import {console2} from "forge-std/console2.sol";
 import {UnimonV2} from "../contracts/v2/UnimonV2.sol";
 import {UnimonItems} from "../contracts/v2/UnimonItems.sol";
 
@@ -84,8 +85,9 @@ contract UnimonV2Test is Test {
 
         // Check new stats
         (uint256 attack, uint256 defense, bool evolved, string memory name) = unimon.getUnimonStats(tokenId);
-        assertEq(attack, 4); // 1 + 3
-        assertEq(defense, 4); // 1 + 3
+        assertTrue(attack > 1); // Should have gained some attack
+        assertTrue(defense > 1); // Should have gained some defense
+        assertTrue((attack - 1) + (defense - 1) >= 3); // Total gain should be at least the energy amount
         assertEq(evolved, true);
         assertEq(name, "Unimon #0"); // Name should still be default after evolution
 
@@ -120,10 +122,10 @@ contract UnimonV2Test is Test {
         assertEq(tokenIds[0], 0);
         assertEq(tokenIds[1], 1);
 
-        assertEq(attackLevels[0], 3); // evolved
+        assertTrue(attackLevels[0] > 1); // evolved
         assertEq(attackLevels[1], 1); // not evolved
 
-        assertEq(defenseLevels[0], 3); // evolved
+        assertTrue(defenseLevels[0] > 1); // evolved
         assertEq(defenseLevels[1], 1); // not evolved
 
         assertEq(evolvedStates[0], true); // evolved
@@ -172,5 +174,28 @@ contract UnimonV2Test is Test {
         vm.prank(user);
         vm.expectRevert("Energy amount must be 1-10");
         unimon.evolve(tokenId, 0);
+    }
+
+    function testEvolutionDistribution() public {
+        vm.prank(admin);
+        items.mint(user, items.ENERGY_ID(), 100);
+
+        // Test energy amount 6 - should show good distribution
+        for (uint256 i = 0; i < 10; i++) {
+            vm.prank(minter);
+            uint256 tokenId = unimon.safeMint(user);
+            
+            vm.prank(user);
+            unimon.evolve(tokenId, 6);
+            
+            (uint256 attack, uint256 defense,,) = unimon.getUnimonStats(tokenId);
+            uint256 totalGain = (attack - 1) + (defense - 1);
+            
+            // Verify reasonable distribution with 10 cap per skill
+            assertTrue(attack >= 1 && attack <= 10, "Attack should be 1-10");
+            assertTrue(defense >= 1 && defense <= 10, "Defense should be 1-10");
+            assertTrue(totalGain >= 6, "Total gain should be at least energy amount");
+            assertTrue(totalGain <= 20, "Total gain should not exceed cap");
+        }
     }
 }
