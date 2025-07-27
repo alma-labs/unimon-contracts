@@ -32,9 +32,9 @@ contract UnimonEquipmentTest is Test {
         unimonItems.grantRole(unimonItems.MINTER_ROLE(), admin);
 
         // Configure equipment
-        equipment.configureEquipment(SWORD_ID, 5, 0, 0); // +5 attack
-        equipment.configureEquipment(SHIELD_ID, 0, 3, 0); // +3 defense
-        equipment.configureEquipment(CURSE_ID, -2, -1, -25); // -2 attack, -1 defense, -25% overall
+        equipment.configureEquipment(SWORD_ID, 5, 0, 0, false); // +5 attack (equipable)
+        equipment.configureEquipment(SHIELD_ID, 0, 3, 0, false); // +3 defense (equipable)
+        equipment.configureEquipment(CURSE_ID, -2, -1, -25, false); // -2 attack, -1 defense, -25% overall (equipable)
 
         // Grant equipment role for seamless transfers
         unimonItems.grantRole(unimonItems.EQUIPMENT_ROLE(), address(equipment));
@@ -44,19 +44,21 @@ contract UnimonEquipmentTest is Test {
 
     function testConfigureEquipment() public {
         vm.prank(admin);
-        equipment.configureEquipment(100, 10, -5, 50);
+        equipment.configureEquipment(100, 10, -5, 50, true);
 
-        (int256 attack, int256 defense, int256 percent, bool configured) = equipment.equipmentStats(100);
+        (int256 attack, int256 defense, int256 percent, bool consumable, bool configured) = equipment.equipmentStats(100);
         assertEq(attack, 10);
         assertEq(defense, -5);
         assertEq(percent, 50);
+        assertTrue(consumable);
         assertTrue(configured);
+        assertTrue(equipment.isConsumableItem(100));
     }
 
     function testConfigureEquipmentOnlyManager() public {
         vm.prank(user1);
         vm.expectRevert();
-        equipment.configureEquipment(100, 10, -5, 50);
+        equipment.configureEquipment(100, 10, -5, 50, true);
     }
 
     function testConfigureBulkEquipment() public {
@@ -64,29 +66,34 @@ contract UnimonEquipmentTest is Test {
         int256[] memory attackMods = new int256[](3);
         int256[] memory defenseMods = new int256[](3);
         int256[] memory overallMods = new int256[](3);
+        bool[] memory isConsumables = new bool[](3);
 
         itemIds[0] = 100;
         attackMods[0] = 10;
         defenseMods[0] = 5;
         overallMods[0] = 0;
+        isConsumables[0] = false;
         itemIds[1] = 101;
         attackMods[1] = 0;
         defenseMods[1] = 8;
         overallMods[1] = 15;
+        isConsumables[1] = true;
         itemIds[2] = 102;
         attackMods[2] = -2;
         defenseMods[2] = -3;
         overallMods[2] = -10;
+        isConsumables[2] = false;
 
         vm.prank(admin);
-        equipment.configureBulkEquipment(itemIds, attackMods, defenseMods, overallMods);
+        equipment.configureBulkEquipment(itemIds, attackMods, defenseMods, overallMods, isConsumables);
 
         // Verify all items were configured correctly
         for (uint256 i = 0; i < itemIds.length; i++) {
-            (int256 attack, int256 defense, int256 percent, bool configured) = equipment.equipmentStats(itemIds[i]);
+            (int256 attack, int256 defense, int256 percent, bool consumable, bool configured) = equipment.equipmentStats(itemIds[i]);
             assertEq(attack, attackMods[i]);
             assertEq(defense, defenseMods[i]);
             assertEq(percent, overallMods[i]);
+            assertEq(consumable, isConsumables[i]);
             assertTrue(configured);
         }
     }
@@ -96,10 +103,11 @@ contract UnimonEquipmentTest is Test {
         int256[] memory attackMods = new int256[](3); // Different length
         int256[] memory defenseMods = new int256[](2);
         int256[] memory overallMods = new int256[](2);
+        bool[] memory isConsumables = new bool[](2);
 
         vm.prank(admin);
         vm.expectRevert("Array lengths must match");
-        equipment.configureBulkEquipment(itemIds, attackMods, defenseMods, overallMods);
+        equipment.configureBulkEquipment(itemIds, attackMods, defenseMods, overallMods, isConsumables);
     }
 
     function testConfigureBulkEquipmentOnlyManager() public {
@@ -107,10 +115,11 @@ contract UnimonEquipmentTest is Test {
         int256[] memory attackMods = new int256[](1);
         int256[] memory defenseMods = new int256[](1);
         int256[] memory overallMods = new int256[](1);
+        bool[] memory isConsumables = new bool[](1);
 
         vm.prank(user1);
         vm.expectRevert();
-        equipment.configureBulkEquipment(itemIds, attackMods, defenseMods, overallMods);
+        equipment.configureBulkEquipment(itemIds, attackMods, defenseMods, overallMods, isConsumables);
     }
 
     function testEquipItem() public {
@@ -268,7 +277,7 @@ contract UnimonEquipmentTest is Test {
     function testStatsCanBeNegative() public {
         // Configure a very negative equipment
         vm.prank(admin);
-        equipment.configureEquipment(200, -100, -100, -99);
+        equipment.configureEquipment(200, -100, -100, -99, false);
 
         vm.startPrank(admin);
         uint256 tokenId = unimonV2.safeMint(user1);

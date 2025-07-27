@@ -1,7 +1,6 @@
 Solidity
 
 - [ ] Basic Battle Contract Logic
-- [ ] All production configurations
 
 Backend
 
