@@ -12,7 +12,8 @@ contract UnimonV2 is ERC721, ERC721Enumerable, AccessControl, ERC721Burnable {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     UnimonItems public unimonItems;
     uint256 private _nextTokenId;
-    uint256 public maxSupply = 10000; // Default hard cap of 10k
+    uint256 public maxSupply = 10000;
+    bool public evolutionsEnabled = true;
 
     mapping(uint256 => UnimonStats) public unimonStats;
 
@@ -26,6 +27,7 @@ contract UnimonV2 is ERC721, ERC721Enumerable, AccessControl, ERC721Burnable {
     event UnimonEvolved(uint256 indexed tokenId, uint256 newAttackLevel, uint256 newDefenseLevel);
     event UnimonNameSet(uint256 indexed tokenId, string name);
     event MaxSupplyUpdated(uint256 oldMaxSupply, uint256 newMaxSupply);
+    event EvolutionsToggled(bool enabled);
 
     constructor(address _unimonItems) ERC721("UnimonV2", "UNIMON") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -115,25 +117,28 @@ contract UnimonV2 is ERC721, ERC721Enumerable, AccessControl, ERC721Burnable {
         INTERNAL FUNCTIONS
     */
 
-    function _calculateEvolutionStats(uint256 energyAmount, uint256 tokenId) internal view returns (uint256 attackBonus, uint256 defenseBonus) {
+    function _calculateEvolutionStats(
+        uint256 energyAmount,
+        uint256 tokenId
+    ) internal view returns (uint256 attackBonus, uint256 defenseBonus) {
         bytes32 seed = keccak256(abi.encodePacked(tokenId, block.timestamp, msg.sender, energyAmount));
         uint256 hash = uint256(seed);
-        
+
         // Choose total stats between energyAmount and 2x energy amount
         uint256 minStats = energyAmount;
         uint256 maxStats = energyAmount * 2;
         uint256 totalStats = minStats + (hash % (maxStats - minStats + 1));
-        
+
         // Cap totalStats at 18 (max possible with 9+9)
         if (totalStats > 18) {
             totalStats = 18;
         }
-        
+
         // Randomly distribute between attack and defense
         uint256 attackSeed = uint256(keccak256(abi.encodePacked(seed, "attack")));
         attackBonus = attackSeed % (totalStats + 1); // 0 to totalStats
         defenseBonus = totalStats - attackBonus;
-        
+
         // Cap each skill at 9 bonus (since base is 1, total will be 10)
         // Redistribute excess to ensure no stats are lost
         if (attackBonus > 9) {
@@ -158,6 +163,7 @@ contract UnimonV2 is ERC721, ERC721Enumerable, AccessControl, ERC721Burnable {
         require(ownerOf(tokenId) == msg.sender, "You don't own this Unimon");
         require(energyAmount >= 1 && energyAmount <= 10, "Energy amount must be 1-10");
         require(!unimonStats[tokenId].evolved, "Unimon already evolved");
+        require(evolutionsEnabled, "Evolutions are currently disabled");
 
         uint256 energyId = unimonItems.ENERGY_ID();
         require(unimonItems.balanceOf(msg.sender, energyId) > 0, "Insufficient energy");
@@ -181,6 +187,11 @@ contract UnimonV2 is ERC721, ERC721Enumerable, AccessControl, ERC721Burnable {
 
         unimonStats[tokenId].name = name;
         emit UnimonNameSet(tokenId, name);
+    }
+
+    function toggleEvolutions(bool _enabled) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        evolutionsEnabled = _enabled;
+        emit EvolutionsToggled(_enabled);
     }
 
     /*
