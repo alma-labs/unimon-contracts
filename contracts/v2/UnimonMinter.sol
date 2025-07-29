@@ -14,8 +14,19 @@ contract UnimonMinter is AccessControl, ReentrancyGuard {
     uint256 public constant MINT_PRICE = 0.0000111 ether;
     uint256 public constant MAX_MINT_PER_TX = 100;
 
+    // Prize functionality
+    mapping(address => uint256) public prizesForAddress;
+    mapping(address => bool) public hasClaimed;
+    bool public claimsEnabled;
+
     event Minted(address indexed minter, uint256 amount, uint256 totalCost);
     event MintedWithCoupons(address indexed minter, uint256 amount, uint256 totalCost, uint256 couponsUsed);
+    event PrizeClaimed(address indexed claimant, uint256 amount);
+
+    error AlreadyClaimed();
+    error NoPrize();
+    error InsufficientContractBalance();
+    error ClaimsDisabled();
 
     constructor(address _unimonNFT, address _unimonItems, address _admin) {
         unimonNFT = UnimonV2(_unimonNFT);
@@ -55,6 +66,43 @@ contract UnimonMinter is AccessControl, ReentrancyGuard {
         emit MintedWithCoupons(msg.sender, amount, totalCost, amount);
     }
 
+    function claimPrize() external nonReentrant {
+        if (!claimsEnabled) revert ClaimsDisabled();
+        if (hasClaimed[msg.sender]) revert AlreadyClaimed();
+
+        uint256 prizeAmount = prizesForAddress[msg.sender];
+        if (prizeAmount == 0) revert NoPrize();
+        if (address(this).balance < prizeAmount) revert InsufficientContractBalance();
+
+        hasClaimed[msg.sender] = true;
+
+        (bool success, ) = payable(msg.sender).call{value: prizeAmount}("");
+        require(success, "Transfer failed");
+
+        emit PrizeClaimed(msg.sender, prizeAmount);
+    }
+
+    /*
+        VIEW FUNCTIONS
+    */
+
+    function getClaimStatus(address user) external view returns (bool canClaim, uint256 amount, string memory reason) {
+        if (!claimsEnabled) {
+            return (false, 0, "Claims are disabled");
+        }
+        if (hasClaimed[user]) {
+            return (false, 0, "Already claimed");
+        }
+        uint256 prizeAmount = prizesForAddress[user];
+        if (prizeAmount == 0) {
+            return (false, 0, "No prize available");
+        }
+        if (address(this).balance < prizeAmount) {
+            return (false, prizeAmount, "Insufficient contract balance");
+        }
+        return (true, prizeAmount, "Ready to claim");
+    }
+
     /*
         INTERNAL FUNCTIONS
     */
@@ -81,6 +129,17 @@ contract UnimonMinter is AccessControl, ReentrancyGuard {
     /*
         ADMIN FUNCTIONS
     */
+
+    function toggleClaims(bool enabled) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        claimsEnabled = enabled;
+    }
+
+    function setPrizes(address[] calldata users, uint256[] calldata amounts) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(users.length == amounts.length, "Length mismatch");
+        for (uint256 i = 0; i < users.length; i++) {
+            prizesForAddress[users[i]] = amounts[i];
+        }
+    }
 
     function withdrawPrizePool(address to, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(amount <= address(this).balance, "Insufficient contract balance");

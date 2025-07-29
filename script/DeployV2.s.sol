@@ -171,6 +171,13 @@ contract DeployV2 is Script {
         // Grant equipment role for seamless transfers
         items.grantRole(items.EQUIPMENT_ROLE(), address(equipment));
 
+        // Grant RANDOMNESS_HANDLER role to randomness suppliers
+        gacha.grantRole(gacha.RANDOMNESS_HANDLER(), 0xa205537dc7096852AF727026dCEAA2087dAAdbfe);
+        gacha.grantRole(gacha.RANDOMNESS_HANDLER(), 0xBd9a4B7100d4c7EDB66DB16B24E6bfcddB32e59D);
+        gacha.grantRole(gacha.RANDOMNESS_HANDLER(), 0x46c00cA330BDB5F2622E65d2f7770e2583F7B9B5);
+        gacha.grantRole(gacha.RANDOMNESS_HANDLER(), 0xf9Ac5Df2702dB617A7Dc9758fe74181E3b201343);
+        gacha.grantRole(gacha.RANDOMNESS_HANDLER(), 0x7633de105FB581Be42fa9d35281188c0f5756a1C);
+
         // 7. Configure gacha with item IDs and weights
         gacha.updateGacha(GACHA_ITEM_IDS, GACHA_WEIGHTS);
 
