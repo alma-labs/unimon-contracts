@@ -42,9 +42,10 @@ contract UnimonMinterTest is Test {
     }
 
     function testInitialState() public view {
-        assertEq(minter.MINT_PRICE(), 0.0000111 ether);
+        assertEq(minter.MINT_PRICE(), 0.0111 ether);
         assertEq(minter.MAX_MINT_PER_TX(), 100);
         assertEq(minter.totalMinted(), 0);
+        assertTrue(minter.mintingEnabled()); // Minting should be enabled by default
     }
 
     function testMintSingle() public {
@@ -384,6 +385,12 @@ contract UnimonMinterTest is Test {
         minter.toggleClaims(true);
     }
 
+    function test_RevertWhen_NonAdminTogglesMinting() public {
+        vm.prank(user);
+        vm.expectRevert();
+        minter.toggleMinting(false);
+    }
+
     function test_RevertWhen_SetPrizesLengthMismatch() public {
         address[] memory users = new address[](2);
         uint256[] memory amounts = new uint256[](1);
@@ -415,5 +422,117 @@ contract UnimonMinterTest is Test {
 
         vm.prank(user);
         minter.claimPrize();
+    }
+
+    function testToggleMinting() public {
+        // Minting should be enabled by default
+        assertTrue(minter.mintingEnabled());
+
+        // Disable minting
+        vm.prank(admin);
+        minter.toggleMinting(false);
+        assertFalse(minter.mintingEnabled());
+
+        // Enable minting
+        vm.prank(admin);
+        minter.toggleMinting(true);
+        assertTrue(minter.mintingEnabled());
+    }
+
+    function testToggleMintingEvent() public {
+        vm.expectEmit(false, false, false, true);
+        emit UnimonMinter.MintingToggled(false);
+
+        vm.prank(admin);
+        minter.toggleMinting(false);
+
+        vm.expectEmit(false, false, false, true);
+        emit UnimonMinter.MintingToggled(true);
+
+        vm.prank(admin);
+        minter.toggleMinting(true);
+    }
+
+    function testMintWhenDisabled() public {
+        // Disable minting
+        vm.prank(admin);
+        minter.toggleMinting(false);
+
+        uint256 price = minter.MINT_PRICE();
+
+        // Try to mint when disabled
+        vm.prank(user);
+        vm.expectRevert(UnimonMinter.MintingDisabled.selector);
+        minter.mint{value: price}(1);
+    }
+
+    function testMintWithCouponsWhenDisabled() public {
+        // Disable minting
+        vm.prank(admin);
+        minter.toggleMinting(false);
+
+        // Give user coupons
+        vm.prank(admin);
+        items.mint(user, items.MINT_COUPON_ID(), 1);
+
+        uint256 discountedPrice = minter.MINT_PRICE() / 2;
+
+        // Try to mint with coupons when disabled
+        vm.prank(user);
+        vm.expectRevert(UnimonMinter.MintingDisabled.selector);
+        minter.mintWithCoupons{value: discountedPrice}(1);
+    }
+
+    function testMintReEnabled() public {
+        uint256 price = minter.MINT_PRICE();
+
+        // Disable minting
+        vm.prank(admin);
+        minter.toggleMinting(false);
+
+        // Try to mint when disabled
+        vm.prank(user);
+        vm.expectRevert(UnimonMinter.MintingDisabled.selector);
+        minter.mint{value: price}(1);
+
+        // Re-enable minting
+        vm.prank(admin);
+        minter.toggleMinting(true);
+
+        // Should work now
+        vm.prank(user);
+        minter.mint{value: price}(1);
+
+        assertEq(unimon.balanceOf(user), 1);
+        assertEq(minter.totalMinted(), 1);
+    }
+
+    function testMintWithCouponsReEnabled() public {
+        // Give user coupons
+        vm.prank(admin);
+        items.mint(user, items.MINT_COUPON_ID(), 1);
+
+        uint256 discountedPrice = minter.MINT_PRICE() / 2;
+
+        // Disable minting
+        vm.prank(admin);
+        minter.toggleMinting(false);
+
+        // Try to mint with coupons when disabled
+        vm.prank(user);
+        vm.expectRevert(UnimonMinter.MintingDisabled.selector);
+        minter.mintWithCoupons{value: discountedPrice}(1);
+
+        // Re-enable minting
+        vm.prank(admin);
+        minter.toggleMinting(true);
+
+        // Should work now
+        vm.prank(user);
+        minter.mintWithCoupons{value: discountedPrice}(1);
+
+        assertEq(unimon.balanceOf(user), 1);
+        assertEq(minter.totalMinted(), 1);
+        assertEq(items.balanceOf(user, items.MINT_COUPON_ID()), 0);
     }
 }

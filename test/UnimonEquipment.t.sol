@@ -38,6 +38,8 @@ contract UnimonEquipmentTest is Test {
 
         // Grant equipment role for seamless transfers
         unimonItems.grantRole(unimonItems.EQUIPMENT_ROLE(), address(equipment));
+        // Grant spender role for burning consumable items
+        unimonItems.grantRole(unimonItems.SPENDER_ROLE(), address(equipment));
 
         vm.stopPrank();
     }
@@ -357,6 +359,184 @@ contract UnimonEquipmentTest is Test {
         vm.expectEmit(true, true, true, false);
         emit UnimonEquipment.ItemEquipped(tokenId, SHIELD_ID, user1);
         equipment.equipItem(tokenId, SHIELD_ID);
+        vm.stopPrank();
+    }
+
+    // Tests for hasConsumableEquipped view function
+    function testHasConsumableEquippedNoItem() public {
+        vm.startPrank(admin);
+        uint256 tokenId = unimonV2.safeMint(user1);
+        vm.stopPrank();
+
+        assertFalse(equipment.hasConsumableEquipped(tokenId));
+    }
+
+    function testHasConsumableEquippedNonConsumable() public {
+        vm.startPrank(admin);
+        uint256 tokenId = unimonV2.safeMint(user1);
+        unimonItems.mint(user1, SWORD_ID, 1);
+        vm.stopPrank();
+
+        vm.prank(user1);
+        equipment.equipItem(tokenId, SWORD_ID);
+
+        assertFalse(equipment.hasConsumableEquipped(tokenId));
+    }
+
+    function testHasConsumableEquippedConsumable() public {
+        // Configure a consumable item
+        vm.prank(admin);
+        equipment.configureEquipment(999, 5, 3, 10, true); // Consumable potion
+
+        vm.startPrank(admin);
+        uint256 tokenId = unimonV2.safeMint(user1);
+        unimonItems.mint(user1, 999, 1);
+        vm.stopPrank();
+
+        vm.prank(user1);
+        equipment.equipItem(tokenId, 999);
+
+        assertTrue(equipment.hasConsumableEquipped(tokenId));
+    }
+
+    // Tests for consumeUponBattle function
+    function testConsumeUponBattle() public {
+        // Configure a consumable item
+        vm.prank(admin);
+        equipment.configureEquipment(999, 5, 3, 10, true); // Consumable potion
+
+        vm.startPrank(admin);
+        uint256 tokenId = unimonV2.safeMint(user1);
+        unimonItems.mint(user1, 999, 1);
+        vm.stopPrank();
+
+        vm.prank(user1);
+        equipment.equipItem(tokenId, 999);
+
+        // Verify item is equipped
+        assertEq(equipment.getEquippedItem(tokenId), 999);
+        assertTrue(equipment.hasConsumableEquipped(tokenId));
+
+        // Consume the item
+        vm.prank(admin);
+        equipment.consumeUponBattle(tokenId);
+
+        // Verify item is consumed (burned) and unequipped
+        assertEq(equipment.getEquippedItem(tokenId), 0);
+        assertFalse(equipment.hasConsumableEquipped(tokenId));
+        assertEq(unimonItems.balanceOf(address(equipment), 999), 0);
+        assertEq(unimonItems.balanceOf(user1, 999), 0); // Item was burned, not returned
+    }
+
+    function testConsumeUponBattleOnlyManager() public {
+        // Configure a consumable item
+        vm.prank(admin);
+        equipment.configureEquipment(999, 5, 3, 10, true);
+
+        vm.startPrank(admin);
+        uint256 tokenId = unimonV2.safeMint(user1);
+        unimonItems.mint(user1, 999, 1);
+        vm.stopPrank();
+
+        vm.prank(user1);
+        equipment.equipItem(tokenId, 999);
+
+        // Non-manager cannot consume
+        vm.prank(user1);
+        vm.expectRevert();
+        equipment.consumeUponBattle(tokenId);
+    }
+
+    function testConsumeUponBattleNoItemEquipped() public {
+        vm.startPrank(admin);
+        uint256 tokenId = unimonV2.safeMint(user1);
+        vm.stopPrank();
+
+        vm.prank(admin);
+        vm.expectRevert("No item equipped");
+        equipment.consumeUponBattle(tokenId);
+    }
+
+    function testConsumeUponBattleNonConsumableItem() public {
+        vm.startPrank(admin);
+        uint256 tokenId = unimonV2.safeMint(user1);
+        unimonItems.mint(user1, SWORD_ID, 1);
+        vm.stopPrank();
+
+        vm.prank(user1);
+        equipment.equipItem(tokenId, SWORD_ID);
+
+        // Cannot consume non-consumable item
+        vm.prank(admin);
+        vm.expectRevert("Equipped item is not consumable");
+        equipment.consumeUponBattle(tokenId);
+    }
+
+    function testConsumeUponBattleEmitsEvent() public {
+        // Configure a consumable item
+        vm.prank(admin);
+        equipment.configureEquipment(999, 5, 3, 10, true);
+
+        vm.startPrank(admin);
+        uint256 tokenId = unimonV2.safeMint(user1);
+        unimonItems.mint(user1, 999, 1);
+        vm.stopPrank();
+
+        vm.prank(user1);
+        equipment.equipItem(tokenId, 999);
+
+        // Consume should emit ItemUnequipped event
+        vm.prank(admin);
+        vm.expectEmit(true, true, true, false);
+        emit UnimonEquipment.ItemUnequipped(tokenId, 999, user1);
+        equipment.consumeUponBattle(tokenId);
+    }
+
+    function testConsumeUponBattleMultipleConsumables() public {
+        // Configure multiple consumable items
+        vm.startPrank(admin);
+        equipment.configureEquipment(100, 5, 0, 0, true); // Consumable attack potion
+        equipment.configureEquipment(101, 0, 5, 0, true); // Consumable defense potion
+        equipment.configureEquipment(102, 3, 3, 10, true); // Consumable all-around potion
+        vm.stopPrank();
+
+        vm.startPrank(admin);
+        uint256 tokenId = unimonV2.safeMint(user1);
+        unimonItems.mint(user1, 100, 1);
+        unimonItems.mint(user1, 101, 1);
+        unimonItems.mint(user1, 102, 1);
+        vm.stopPrank();
+
+        vm.startPrank(user1);
+        // Equip first consumable
+        equipment.equipItem(tokenId, 100);
+        assertTrue(equipment.hasConsumableEquipped(tokenId));
+
+        // Consume it
+        vm.stopPrank();
+        vm.prank(admin);
+        equipment.consumeUponBattle(tokenId);
+        assertFalse(equipment.hasConsumableEquipped(tokenId));
+
+        // Equip second consumable
+        vm.prank(user1);
+        equipment.equipItem(tokenId, 101);
+        assertTrue(equipment.hasConsumableEquipped(tokenId));
+
+        // Consume it
+        vm.prank(admin);
+        equipment.consumeUponBattle(tokenId);
+        assertFalse(equipment.hasConsumableEquipped(tokenId));
+
+        // Equip third consumable
+        vm.prank(user1);
+        equipment.equipItem(tokenId, 102);
+        assertTrue(equipment.hasConsumableEquipped(tokenId));
+
+        // Consume it
+        vm.prank(admin);
+        equipment.consumeUponBattle(tokenId);
+        assertFalse(equipment.hasConsumableEquipped(tokenId));
         vm.stopPrank();
     }
 }
