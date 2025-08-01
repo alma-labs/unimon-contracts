@@ -1,4 +1,2 @@
-Solidity
-
 - [ ] Basic Battle Contract Logic
-- [ ] General Store Contract
+- [ ] General Store Contract (Redemptions)

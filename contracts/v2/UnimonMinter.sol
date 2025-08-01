@@ -11,7 +11,7 @@ contract UnimonMinter is AccessControl, ReentrancyGuard {
     UnimonItems public immutable unimonItems;
     uint256 public totalMinted;
 
-    uint256 public constant MINT_PRICE = 0.0000111 ether;
+    uint256 public constant MINT_PRICE = 0.0111 ether;
     uint256 public constant MAX_MINT_PER_TX = 100;
 
     // Prize functionality

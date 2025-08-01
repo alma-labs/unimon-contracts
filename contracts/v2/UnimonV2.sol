@@ -127,11 +127,22 @@ contract UnimonV2 is ERC721, ERC721Enumerable, AccessControl, ERC721Burnable {
         // Choose total stats between energyAmount and 2x energy amount
         uint256 minStats = energyAmount;
         uint256 maxStats = energyAmount * 2;
+
         uint256 totalStats = minStats + (hash % (maxStats - minStats + 1));
 
         // Cap totalStats at 18 (max possible with 9+9)
         if (totalStats > 18) {
             totalStats = 18;
+        }
+
+        if (energyAmount >= 9) {
+            // 40% chance to reduce totalStats by 1
+            uint256 biasSeed = uint256(keccak256(abi.encodePacked(seed, "bias")));
+            if (biasSeed % 100 < 40) {
+                if (totalStats > minStats + 1) {
+                    totalStats -= 1;
+                }
+            }
         }
 
         // Randomly distribute between attack and defense
@@ -167,7 +178,7 @@ contract UnimonV2 is ERC721, ERC721Enumerable, AccessControl, ERC721Burnable {
 
         uint256 energyId = unimonItems.ENERGY_ID();
         require(unimonItems.balanceOf(msg.sender, energyId) > 0, "Insufficient energy");
-        unimonItems.spendItem(msg.sender, energyId, 1);
+        unimonItems.spendItem(msg.sender, energyId, energyAmount);
 
         (uint256 attackBonus, uint256 defenseBonus) = _calculateEvolutionStats(energyAmount, tokenId);
         uint256 newAttackLevel = unimonStats[tokenId].attackLevel + attackBonus;

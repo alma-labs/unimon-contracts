@@ -92,7 +92,7 @@ contract UnimonV2Test is Test {
         assertEq(name, "Unimon #0"); // Name should still be default after evolution
 
         // Check energy was spent
-        assertEq(items.balanceOf(user, items.ENERGY_ID()), 9);
+        assertEq(items.balanceOf(user, items.ENERGY_ID()), 7);
     }
 
     function testGetAllUnimonForAddress() public {
@@ -269,5 +269,92 @@ contract UnimonV2Test is Test {
         vm.prank(user);
         vm.expectRevert();
         unimon.toggleEvolutions(false);
+    }
+
+    function testEvolutionDistributionAnalysis() public {
+        vm.prank(admin);
+        items.mint(user, items.ENERGY_ID(), 10000); // Give plenty of energy
+
+        console2.log("=== EVOLUTION DISTRIBUTION ANALYSIS ===");
+        console2.log("Testing 100 evolutions for each energy amount (1-10)");
+        console2.log("");
+
+        // Test each energy amount 100 times
+        for (uint256 energy = 1; energy <= 10; energy++) {
+            console2.log(string.concat("--- Energy Amount: ", vm.toString(energy), " ---"));
+            
+            uint256 totalAttack = 0;
+            uint256 totalDefense = 0;
+            uint256 minTotal = type(uint256).max;
+            uint256 maxTotal = 0;
+            uint256[21] memory totalCounts; // Track distribution of totals (0-20)
+            
+            for (uint256 i = 0; i < 100; i++) {
+                vm.prank(minter);
+                uint256 tokenId = unimon.safeMint(user);
+                
+                vm.prank(user);
+                unimon.evolve(tokenId, energy);
+                
+                (uint256 attack, uint256 defense, , ) = unimon.getUnimonStats(tokenId);
+                uint256 total = attack + defense;
+                
+                totalAttack += attack;
+                totalDefense += defense;
+                
+                if (total < minTotal) minTotal = total;
+                if (total > maxTotal) maxTotal = total;
+                
+                totalCounts[total]++;
+                
+                // Log every 10th evolution to avoid spam
+                if (i % 10 == 0) {
+                    console2.log(string.concat("Sample ", vm.toString(i), ": Energy=", vm.toString(energy), " Attack=", vm.toString(attack), " Defense=", vm.toString(defense), " Total=", vm.toString(total)));
+                }
+            }
+            
+            // Calculate basic statistics
+            uint256 avgAttack = totalAttack / 100;
+            uint256 avgDefense = totalDefense / 100;
+            uint256 avgTotal = (totalAttack + totalDefense) / 100;
+            
+            // Find mode
+            uint256 mode = 0;
+            uint256 maxCount = 0;
+            for (uint256 i = 0; i < 21; i++) {
+                if (totalCounts[i] > maxCount) {
+                    maxCount = totalCounts[i];
+                    mode = i;
+                }
+            }
+            
+            console2.log(string.concat("--- Energy ", vm.toString(energy), " Summary Stats ---"));
+            console2.log(string.concat("Avg Attack: ", vm.toString(avgAttack), " | Avg Defense: ", vm.toString(avgDefense), " | Avg Total: ", vm.toString(avgTotal)));
+            console2.log(string.concat("Min Total: ", vm.toString(minTotal), " | Max Total: ", vm.toString(maxTotal)));
+            console2.log(string.concat("Mode Total: ", vm.toString(mode), " (", vm.toString(maxCount), " occurrences)"));
+            console2.log(string.concat("Expected Min Total: ", vm.toString(energy), " | Expected Max Total: ", vm.toString(energy * 2)));
+            
+            // Show distribution
+            console2.log("Total Distribution:");
+            for (uint256 i = 0; i < 21; i++) {
+                if (totalCounts[i] > 0) {
+                    console2.log(string.concat("  Total ", vm.toString(i), ": ", vm.toString(totalCounts[i]), " times"));
+                }
+            }
+            console2.log("");
+        }
+        
+        console2.log("=== ANALYSIS COMPLETE ===");
+    }
+    
+    function sqrt(uint256 x) internal pure returns (uint256) {
+        if (x == 0) return 0;
+        uint256 z = (x + 1) / 2;
+        uint256 y = x;
+        while (z < y) {
+            y = z;
+            z = (x / z + z) / 2;
+        }
+        return y;
     }
 }
