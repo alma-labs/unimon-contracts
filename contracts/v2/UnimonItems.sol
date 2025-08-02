@@ -11,32 +11,32 @@ import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
  * @author Unimon Team
  * @notice ERC1155 token contract for Unimon game items including energy, keys, and mint coupons
  * @dev This contract manages all fungible items in the Unimon ecosystem
- * 
+ *
  * Key features:
  * - ERC1155 multi-token standard for efficient item management
  * - Role-based access control for minting and spending
  * - Supply tracking for all tokens
  * - Airdrop functionality for v1 users
  * - Equipment transfer whitelisting
- * 
+ *
  * @custom:security This contract uses OpenZeppelin's AccessControl, ERC1155Burnable, and ERC1155Supply
  */
 contract UnimonItems is ERC1155, AccessControl, ERC1155Burnable, ERC1155Supply {
     /// @notice Role for entities that can mint new items
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    
+
     /// @notice Role for entities that can spend/burn items from users
     bytes32 public constant SPENDER_ROLE = keccak256("SPENDER_ROLE");
-    
+
     /// @notice Role for equipment contracts that can transfer items
     bytes32 public constant EQUIPMENT_ROLE = keccak256("EQUIPMENT_ROLE");
 
     /// @notice Token ID for energy items (used for evolution)
     uint256 public constant ENERGY_ID = 0;
-    
+
     /// @notice Token ID for UNIKEY items (used for gacha pulls)
     uint256 public constant UNIKEY_ID = 1;
-    
+
     /// @notice Token ID for mint coupons (reduces mint cost by 50%)
     uint256 public constant MINT_COUPON_ID = 2;
 
@@ -48,7 +48,7 @@ contract UnimonItems is ERC1155, AccessControl, ERC1155Burnable, ERC1155Supply {
     /// @param id Token ID of the minted item
     /// @param amount Amount minted
     event ItemMinted(address indexed to, uint256 indexed id, uint256 amount);
-    
+
     /// @notice Emitted when items are burned/spent
     /// @param from Address losing the items
     /// @param id Token ID of the burned item
@@ -179,22 +179,6 @@ contract UnimonItems is ERC1155, AccessControl, ERC1155Burnable, ERC1155Supply {
         uint256[] memory amounts
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _safeBatchTransferFrom(from, to, ids, amounts, "");
-    }
-
-    /**
-     * @notice Airdrop mint coupons to multiple addresses
-     * @param recipients Array of recipient addresses
-     * @param amounts Array of coupon amounts for each recipient
-     * @dev Only callable by MINTER_ROLE
-     * @dev Arrays must have the same length
-     */
-    function airdropMintCoupons(address[] memory recipients, uint256[] memory amounts) external onlyRole(MINTER_ROLE) {
-        require(recipients.length == amounts.length, "Arrays length mismatch");
-
-        for (uint256 i = 0; i < recipients.length; i++) {
-            _mint(recipients[i], MINT_COUPON_ID, amounts[i], "");
-            emit ItemMinted(recipients[i], MINT_COUPON_ID, amounts[i]);
-        }
     }
 
     /**
