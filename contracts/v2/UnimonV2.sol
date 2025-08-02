@@ -57,9 +57,10 @@ contract UnimonV2 is ERC721, ERC721Enumerable, AccessControl, ERC721Burnable {
 
     /// @notice Emitted when a Unimon is evolved
     /// @param tokenId ID of the evolved Unimon
+    /// @param energyAmount Amount of energy used for evolution
     /// @param newAttackLevel New attack level after evolution
     /// @param newDefenseLevel New defense level after evolution
-    event UnimonEvolved(uint256 indexed tokenId, uint256 newAttackLevel, uint256 newDefenseLevel);
+    event UnimonEvolved(uint256 indexed tokenId, uint256 energyAmount, uint256 newAttackLevel, uint256 newDefenseLevel);
     
     /// @notice Emitted when a Unimon's name is set
     /// @param tokenId ID of the Unimon
@@ -312,7 +313,7 @@ contract UnimonV2 is ERC721, ERC721Enumerable, AccessControl, ERC721Burnable {
         unimonStats[tokenId].defenseLevel = newDefenseLevel;
         unimonStats[tokenId].evolved = true;
 
-        emit UnimonEvolved(tokenId, newAttackLevel, newDefenseLevel);
+        emit UnimonEvolved(tokenId, energyAmount, newAttackLevel, newDefenseLevel);
     }
 
     /**

@@ -33,7 +33,7 @@ contract UnimonMinter is AccessControl, ReentrancyGuard {
     uint256 public totalMinted;
 
     /// @notice Price per NFT mint in ETH (0.0111 ETH)
-    uint256 public constant MINT_PRICE = 0.0111 ether;
+    uint256 public constant MINT_PRICE = 0.0000111 ether;
 
     /// @notice Maximum number of NFTs that can be minted per transaction
     uint256 public constant MAX_MINT_PER_TX = 100;
