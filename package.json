@@ -1,6 +1,7 @@
 {
   "name": "unimon-contracts",
   "scripts": {
+    "deploy:v2": "source .env && forge script script/DeployV2.s.sol:DeployV2 --rpc-url https://mainnet.unichain.org --broadcast --verify --verifier etherscan --verifier-url https://api.uniscan.xyz/api --etherscan-api-key $UNICHAIN_API_KEY",
     "deploy:energy": "source .env && forge script script/DeployEnergy.s.sol:DeployEnergy --rpc-url https://mainnet.unichain.org --broadcast --verify --verifier etherscan --verifier-url https://api.uniscan.xyz/api --etherscan-api-key $UNICHAIN_API_KEY",
     "deploy:hook": "source .env && forge script script/DeployHook.s.sol:DeployHook --rpc-url https://mainnet.unichain.org --broadcast --verify --verifier etherscan --verifier-url https://api.uniscan.xyz/api --etherscan-api-key $UNICHAIN_API_KEY",
     "deploy:registry": "source .env && forge script script/DeployUserRegistry.s.sol:DeployUserRegistry --rpc-url https://mainnet.unichain.org --broadcast --verify --verifier etherscan --verifier-url https://api.uniscan.xyz/api --etherscan-api-key $UNICHAIN_API_KEY",

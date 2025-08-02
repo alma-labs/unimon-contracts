@@ -2,10 +2,10 @@
 pragma solidity 0.8.26;
 
 import {Script} from "forge-std/Script.sol";
-import {Hooks} from "../lib/v4-periphery/lib/v4-core/src/libraries/Hooks.sol";
-import {IPoolManager} from "../lib/v4-periphery/lib/v4-core/src/interfaces/IPoolManager.sol";
-import {HookMiner} from "../lib/v4-periphery/src/utils/HookMiner.sol";
-import {UnimonHook} from "../contracts/UnimonHook.sol";
+import {Hooks} from "../../lib/v4-periphery/lib/v4-core/src/libraries/Hooks.sol";
+import {IPoolManager} from "../../lib/v4-periphery/lib/v4-core/src/interfaces/IPoolManager.sol";
+import {HookMiner} from "../../lib/v4-periphery/src/utils/HookMiner.sol";
+import {UnimonHook} from "../../contracts/v1/UnimonHook.sol";
 
 contract DeployHook is Script {
     address constant CREATE2_DEPLOYER = address(0x4e59b44847b379578588920cA78FbF26c0B4956C);
