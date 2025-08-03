@@ -8,6 +8,7 @@ import {UnimonItems} from "../contracts/v2/UnimonItems.sol";
 import {UnimonMinter} from "../contracts/v2/UnimonMinter.sol";
 import {UnimonGacha} from "../contracts/v2/UnimonGacha.sol";
 import {UnimonEquipment} from "../contracts/v2/UnimonEquipment.sol";
+import {UnimonGeneralStore} from "../contracts/v2/UnimonGeneralStore.sol";
 
 contract DeployV2 is Script {
     uint256[] public GACHA_ITEM_IDS = [
@@ -149,7 +150,10 @@ contract DeployV2 is Script {
         // 5. Deploy UnimonEquipment
         UnimonEquipment equipment = new UnimonEquipment(address(nfts), address(items));
 
-        // 6. Set up permissions
+        // 6. Deploy UnimonGeneralStore
+        UnimonGeneralStore generalStore = new UnimonGeneralStore(address(items));
+
+        // 7. Set up permissions
         // Give minter permission to mint NFTs
         nfts.grantRole(nfts.MINTER_ROLE(), address(minter));
 
@@ -171,6 +175,9 @@ contract DeployV2 is Script {
         // Grant equipment role for seamless transfers
         items.grantRole(items.EQUIPMENT_ROLE(), address(equipment));
 
+        // Give general store permission to spend items (for redemptions)
+        items.grantSpenderRole(address(generalStore));
+
         // Grant RANDOMNESS_HANDLER role to randomness suppliers
         gacha.grantRole(gacha.RANDOMNESS_HANDLER(), 0xa205537dc7096852AF727026dCEAA2087dAAdbfe);
         gacha.grantRole(gacha.RANDOMNESS_HANDLER(), 0xBd9a4B7100d4c7EDB66DB16B24E6bfcddB32e59D);
@@ -178,13 +185,13 @@ contract DeployV2 is Script {
         gacha.grantRole(gacha.RANDOMNESS_HANDLER(), 0xf9Ac5Df2702dB617A7Dc9758fe74181E3b201343);
         gacha.grantRole(gacha.RANDOMNESS_HANDLER(), 0x7633de105FB581Be42fa9d35281188c0f5756a1C);
 
-        // 7. Configure gacha with item IDs and weights
+        // 8. Configure gacha with item IDs and weights
         gacha.updateGacha(GACHA_ITEM_IDS, GACHA_WEIGHTS);
 
-        // 8. Configure max supplies for items
+        // 9. Configure max supplies for items
         gacha.setMaxSupply(MAX_SUPPLY_ITEM_IDS, MAX_SUPPLIES);
 
-        // 9. Configure equipment items and consumables with their attack, defense, and probability impacts
+        // 10. Configure equipment items and consumables with their attack, defense, and probability impacts
         // Equipment configuration (includes both equipable items and consumables)
         uint256[] memory equipmentIds = new uint256[](50);
         int256[] memory attackMods = new int256[](50);
@@ -455,7 +462,9 @@ contract DeployV2 is Script {
         console.log("UnimonMinter deployed at:", address(minter));
         console.log("UnimonGacha deployed at:", address(gacha));
         console.log("UnimonEquipment deployed at:", address(equipment));
+        console.log("UnimonGeneralStore deployed at:", address(generalStore));
         console.log("Gacha configured with", GACHA_ITEM_IDS.length, "equipment and consumable items");
         console.log("Max supplies configured for", MAX_SUPPLY_ITEM_IDS.length, "non-equipment items");
+        console.log("General store configured with spender role for item redemptions");
     }
 }
