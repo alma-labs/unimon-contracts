@@ -8,6 +8,7 @@
     "deploy:battles": "source .env && forge script script/DeployBattles.s.sol:DeployBattles --rpc-url https://mainnet.unichain.org --broadcast --verify --verifier etherscan --verifier-url https://api.uniscan.xyz/api --etherscan-api-key $UNICHAIN_API_KEY",
     "deploy:battlesv2": "source .env && forge script script/DeployBattlesV2.s.sol:DeployBattlesV2 --rpc-url https://mainnet.unichain.org --broadcast --verify --verifier etherscan --verifier-url https://api.uniscan.xyz/api --etherscan-api-key $UNICHAIN_API_KEY",
     "deploy:prizes": "source .env && forge script script/DeployPrizes.s.sol:DeployPrizes --rpc-url https://mainnet.unichain.org --broadcast --verify --verifier etherscan --verifier-url https://api.uniscan.xyz/api --etherscan-api-key $UNICHAIN_API_KEY",
+    "deploy:gm-slayer": "source .env && forge script script/DeployGMAndSlayer.s.sol:DeployGMAndSlayer --rpc-url https://mainnet.unichain.org --broadcast --verify --verifier etherscan --verifier-url https://api.uniscan.xyz/api --etherscan-api-key $UNICHAIN_API_KEY --legacy -vvvv",
     "generate-deploy-config": "npx ts-node script/generate-deploy-config.ts"
   },
   "dependencies": {
