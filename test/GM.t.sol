@@ -148,6 +148,112 @@ contract GMTest is Test {
         assertEq(gm.totalGMsForToken(tokenId), 1);
         assertEq(gm.totalGMsForToken(tokenId1), 1);
     }
+
+    function test_GM_AtPeriodBoundary_AllowsNextDayImmediately() public {
+        // GM once
+        vm.prank(user);
+        gm.gm(tokenId);
+
+        // Warp to exactly the next period start
+        uint256 nextStart = (uint256(_currentPeriod()) + 1) * uint256(gm.periodSeconds());
+        vm.warp(nextStart);
+
+        // Should be available immediately at boundary
+        assertTrue(gm.canGM(user, tokenId));
+        assertEq(gm.timeUntilNextGM(tokenId), 0);
+
+        vm.prank(user);
+        gm.gm(tokenId);
+
+        (uint32 currentStreak, uint32 bestStreak, ) = gm.getStreak(tokenId);
+        assertEq(currentStreak, 2);
+        assertEq(bestStreak, 2);
+    }
+
+    function test_GM_SkipManyDays_ResetsCurrent_KeepBest() public {
+        // Build a 3-day streak
+        for (uint256 i = 0; i < 3; i++) {
+            vm.prank(user);
+            gm.gm(tokenId);
+            if (i < 2) {
+                uint256 nextStart = (uint256(_currentPeriod()) + 1) * uint256(gm.periodSeconds());
+                vm.warp(nextStart + 1);
+            }
+        }
+
+        (uint32 currentStreak, uint32 bestStreak, ) = gm.getStreak(tokenId);
+        assertEq(currentStreak, 3);
+        assertEq(bestStreak, 3);
+
+        // Skip 5 days
+        uint256 farStart = (uint256(_currentPeriod()) + 5) * uint256(gm.periodSeconds());
+        vm.warp(farStart + 1);
+
+        vm.prank(user);
+        gm.gm(tokenId);
+
+        (currentStreak, bestStreak, ) = gm.getStreak(tokenId);
+        assertEq(currentStreak, 1);
+        assertEq(bestStreak, 3);
+    }
+
+    function test_gmAll_MultipleTokens_MultipleDays() public {
+        // Mint two more tokens for user
+        vm.prank(minter);
+        uint256 tokenId1 = unimon.safeMint(user);
+        vm.prank(minter);
+        uint256 tokenId2 = unimon.safeMint(user);
+
+        uint256[] memory tokenIds = new uint256[](3);
+        tokenIds[0] = tokenId;
+        tokenIds[1] = tokenId1;
+        tokenIds[2] = tokenId2;
+
+        vm.prank(user);
+        gm.gmAll(tokenIds);
+
+        // Next day
+        uint256 nextStart = (uint256(_currentPeriod()) + 1) * uint256(gm.periodSeconds());
+        vm.warp(nextStart + 1);
+
+        vm.prank(user);
+        gm.gmAll(tokenIds);
+
+        (uint32 s0, uint32 b0, ) = gm.getStreak(tokenId);
+        (uint32 s1, uint32 b1, ) = gm.getStreak(tokenId1);
+        (uint32 s2, uint32 b2, ) = gm.getStreak(tokenId2);
+        assertEq(s0, 2);
+        assertEq(b0, 2);
+        assertEq(s1, 2);
+        assertEq(b1, 2);
+        assertEq(s2, 2);
+        assertEq(b2, 2);
+
+        // Totals reflect 2 days * 3 tokens
+        assertEq(gm.totalGMsForUser(user), 6);
+    }
+
+    function test_gmAll_RevertsIfAnyAlreadyGMed_TxAtomic() public {
+        // GM tokenId today
+        vm.prank(user);
+        gm.gm(tokenId);
+
+        // Mint another token that hasn't GM'd yet
+        vm.prank(minter);
+        uint256 tokenId1 = unimon.safeMint(user);
+
+        uint256[] memory tokenIds = new uint256[](2);
+        tokenIds[0] = tokenId; // already GM'd
+        tokenIds[1] = tokenId1; // not yet GM'd
+
+        vm.prank(user);
+        vm.expectRevert("Token already GM'd today");
+        gm.gmAll(tokenIds);
+
+        // Ensure atomicity: tokenId1 should not have GM'd
+        assertEq(gm.totalGMsForToken(tokenId1), 0);
+        assertTrue(gm.canGM(user, tokenId1));
+    }
 }
 
 

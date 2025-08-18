@@ -56,7 +56,7 @@ contract GM {
     constructor(address _unimonV2) {
         unimon = UnimonV2(_unimonV2);
         owner = msg.sender;
-        periodSeconds = 1 hours;
+        periodSeconds = 1 days;
     }
 
     modifier onlyOwner() {
@@ -102,13 +102,6 @@ contract GM {
     }
 
     /**
-     * @notice Returns whether msg.sender can GM right now with `tokenId`
-     */
-    function canGM(uint256 tokenId) external view returns (bool) {
-        return canGM(msg.sender, tokenId);
-    }
-
-    /**
      * @notice Returns the number of seconds until `tokenId` can GM again (0 if available now)
      */
     function timeUntilNextGM(uint256 tokenId) public view returns (uint256) {
@@ -127,9 +120,7 @@ contract GM {
         require(lastGmDayPlusOneForToken[tokenId] < day + 1, "Token already GM'd today");
 
         // Update streak
-        uint32 prevDay = lastGmDayPlusOneForToken[tokenId] == 0
-            ? 0
-            : lastGmDayPlusOneForToken[tokenId] - 1;
+        uint32 prevDay = lastGmDayPlusOneForToken[tokenId] == 0 ? 0 : lastGmDayPlusOneForToken[tokenId] - 1;
         uint32 newStreak = (prevDay + 1 == day) ? currentStreakForToken[tokenId] + 1 : 1;
         currentStreakForToken[tokenId] = newStreak;
         if (newStreak > bestStreakForToken[tokenId]) {
@@ -159,15 +150,11 @@ contract GM {
     /**
      * @notice Get current and best streak data for a token
      */
-    function getStreak(uint256 tokenId)
-        external
-        view
-        returns (uint32 currentStreak, uint32 bestStreak, uint32 lastDay)
-    {
+    function getStreak(
+        uint256 tokenId
+    ) external view returns (uint32 currentStreak, uint32 bestStreak, uint32 lastDay) {
         uint32 lastPlusOne = lastGmDayPlusOneForToken[tokenId];
         uint32 last = lastPlusOne == 0 ? 0 : lastPlusOne - 1;
         return (currentStreakForToken[tokenId], bestStreakForToken[tokenId], last);
     }
 }
-
-
